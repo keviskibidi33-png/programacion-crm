@@ -38,25 +38,139 @@ export interface ProgramacionServicio {
     // ... other fields can be added as needed
 }
 
+// --- Mock Data ---
+const MOCK_DATA: ProgramacionServicio[] = [
+    {
+        id: "1",
+        item_numero: 1,
+        recep_numero: "REC-001",
+        ot: "OT-1001",
+        codigo_muestra: "M-2023-001",
+        fecha_recepcion: "2023-10-01",
+        fecha_inicio: "2023-10-02",
+        fecha_entrega_estimada: "2023-10-05",
+        cliente_nombre: "CONSTRUCTORA GLOBAL SAC",
+        descripcion_servicio: "ENSAYO DE COMPRESIÓN DE CONCRETO (PROBETAS)",
+        proyecto: "EDIFICIO MIRAFORES",
+        fecha_entrega_real: "2023-10-05",
+        estado_trabajo: "COMPLETADO",
+        cotizacion_lab: "COT-001",
+        autorizacion_lab: "SI",
+        nota_lab: "Todo conforme",
+        dias_atraso_lab: 0,
+        motivo_dias_atraso_lab: null,
+        evidencia_envio_recepcion: "SI",
+        envio_informes: "SI"
+    },
+    {
+        id: "2",
+        item_numero: 2,
+        recep_numero: "REC-002",
+        ot: "OT-1002",
+        codigo_muestra: "M-2023-002",
+        fecha_recepcion: "2023-10-03",
+        fecha_inicio: "", // Empty to show validation
+        fecha_entrega_estimada: "2023-10-08",
+        cliente_nombre: "MINERA SANTA FE",
+        descripcion_servicio: "ANÁLISIS GRANULOMÉTRICO POR TAMIZADO",
+        proyecto: "EXPANSIÓN NORTE",
+        fecha_entrega_real: null,
+        estado_trabajo: "PENDIENTE",
+        cotizacion_lab: null,
+        autorizacion_lab: null,
+        nota_lab: null,
+        dias_atraso_lab: 2,
+        motivo_dias_atraso_lab: "Falta de personal",
+        evidencia_envio_recepcion: null,
+        envio_informes: null
+    },
+    {
+        id: "3",
+        item_numero: 3,
+        recep_numero: "REC-003",
+        ot: "", // Empty
+        codigo_muestra: "M-2023-003",
+        fecha_recepcion: "2023-10-04",
+        fecha_inicio: "2023-10-04",
+        fecha_entrega_estimada: "2023-10-10",
+        cliente_nombre: "INGENIEROS ASOCIADOS",
+        descripcion_servicio: "CONTENIDO DE HUMEDAD",
+        proyecto: "CARRETERA CENTRAL",
+        fecha_entrega_real: null,
+        estado_trabajo: "PROCESO",
+        cotizacion_lab: "COT-005",
+        autorizacion_lab: "PENDIENTE",
+        nota_lab: "En horno",
+        dias_atraso_lab: 0,
+        motivo_dias_atraso_lab: null,
+        evidencia_envio_recepcion: "SI",
+        envio_informes: "NO"
+    },
+    {
+        id: "4",
+        item_numero: 4,
+        recep_numero: "REC-004",
+        ot: "OT-1004",
+        codigo_muestra: "M-2023-004",
+        fecha_recepcion: "2023-10-04",
+        fecha_inicio: "2023-10-05",
+        fecha_entrega_estimada: "2023-10-12",
+        cliente_nombre: "CONSORCIO VIAL",
+        descripcion_servicio: "LIMITES DE ATTERBERG (LL, LP)",
+        proyecto: "MEJORAMIENTO VIAL",
+        fecha_entrega_real: null,
+        estado_trabajo: "PROCESO",
+        cotizacion_lab: null,
+        autorizacion_lab: null,
+        nota_lab: null,
+        dias_atraso_lab: 0,
+        motivo_dias_atraso_lab: null,
+        evidencia_envio_recepcion: null,
+        envio_informes: null
+    },
+    {
+        id: "5",
+        item_numero: 5,
+        recep_numero: "REC-005",
+        ot: "OT-1005",
+        codigo_muestra: "",
+        fecha_recepcion: "2023-10-06",
+        fecha_inicio: "",
+        fecha_entrega_estimada: "",
+        cliente_nombre: "MUNICIPALIDAD DE LIMA",
+        descripcion_servicio: "DENSIDAD DE CAMPO",
+        proyecto: "PARQUE ZONAL",
+        fecha_entrega_real: null,
+        estado_trabajo: "PENDIENTE",
+        cotizacion_lab: null,
+        autorizacion_lab: null,
+        nota_lab: null,
+        dias_atraso_lab: 5,
+        motivo_dias_atraso_lab: "Equipo en mantenimiento",
+        evidencia_envio_recepcion: null,
+        envio_informes: null
+    }
+]
+
 const columnHelper = createColumnHelper<ProgramacionServicio>()
 
 export function DatagridEditor() {
-    const [data, setData] = useState<ProgramacionServicio[]>([])
-    const [loading, setLoading] = useState(true)
+    const [data, setData] = useState<ProgramacionServicio[]>(MOCK_DATA) // Default to Mock Data
+    const [loading, setLoading] = useState(false)
 
-    // --- Data Fetching ---
+    // --- Data Fetching (Optional / Background) ---
     const fetchServicios = async () => {
         setLoading(true)
         try {
-            // Fetch all for now, similar to previous module
             const res = await fetch(`${API_URL}/programacion`)
-            if (!res.ok) throw new Error("Failed to fetch")
-            const json = await res.json()
-            if (Array.isArray(json)) {
-                setData(json)
-            } else {
-                console.error("Invalid data format", json)
-                setData([])
+            if (res.ok) {
+                const json = await res.json()
+                if (Array.isArray(json) && json.length > 0) {
+                    setData(json)
+                } else {
+                    // Keep mock data if empty
+                    console.log("Using Mock Data")
+                }
             }
         } catch (err) {
             console.error(err)
@@ -65,63 +179,63 @@ export function DatagridEditor() {
         }
     }
 
-    useEffect(() => {
-        fetchServicios()
-    }, [])
+    // useEffect(() => {
+    //   fetchServicios()
+    // }, [])
 
     // --- Columns Definition ---
     const columns = useMemo<ColumnDef<ProgramacionServicio, any>[]>(() => [
         // --- Sticky / Fixed Columns ---
         columnHelper.accessor("item_numero", {
-            header: "ITEM",
-            size: 50,
+            header: "IT",
+            size: 40,
             enablePinning: true,
         }),
         columnHelper.accessor("recep_numero", {
-            header: "RECEP. N",
-            size: 90,
+            header: "RECEP",
+            size: 80,
             enablePinning: true,
         }),
         columnHelper.accessor("ot", {
             header: "OT",
-            size: 100,
+            size: 80,
             enablePinning: true,
         }),
         columnHelper.accessor("codigo_muestra", {
-            header: "CÓDIGOS",
-            size: 120,
+            header: "MUESTRA",
+            size: 100,
             enablePinning: true,
         }),
         columnHelper.accessor("fecha_recepcion", {
-            header: "RECEPCIÓN",
-            size: 100,
+            header: "F. RECEP",
+            size: 90,
             enablePinning: true,
         }),
         columnHelper.accessor("fecha_inicio", {
             header: "INICIO",
-            size: 100,
+            size: 90,
             enablePinning: true,
         }),
         columnHelper.accessor("fecha_entrega_estimada", {
             header: "ENTREGA",
-            size: 100,
+            size: 90,
             enablePinning: true,
         }),
         columnHelper.accessor("cliente_nombre", {
             header: "CLIENTE",
-            size: 200,
+            size: 180,
             enablePinning: true,
         }),
         columnHelper.accessor("descripcion_servicio", {
-            header: "DESCRIPCIÓN SERVICIO",
-            size: 250,
+            header: "DESCRIPCIÓN",
+            size: 200,
             enablePinning: true,
         }),
 
         // --- Scrollable Columns (Metadata & Editable Candidates) ---
         columnHelper.accessor("proyecto", {
             header: "PROYECTO",
-            size: 150,
+            size: 140,
         }),
         columnHelper.accessor("estado_trabajo", {
             header: "ESTADO",
