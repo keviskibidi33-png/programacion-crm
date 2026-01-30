@@ -23,7 +23,11 @@ yarn-debug.log*
 yarn-error.log*
 
 # local env files
+.env
 .env*.local
+.env.local
+.env.development
+.env.production
 
 # vercel
 .vercel
@@ -31,3 +35,15 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# IDE
+.vscode
+.idea
+
+# Logs
+*.log
+logs
+
+# Excel files (sample data)
+*.xlsx
+*.xls

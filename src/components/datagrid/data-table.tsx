@@ -130,26 +130,8 @@ export function DataTable<TData, TValue>({
                             <option value="PENDIENTE">Pendiente</option>
                             <option value="PROCESO">En Proceso</option>
                             <option value="COMPLETADO">Completado</option>
+                            <option value="ENTREGADO">Entregado</option>
                         </select>
-                    )}
-
-                    {/* Delay Filter - More robust check */}
-                    {table.getAllColumns().find(c => c.id === "dias_atraso_lab") && (
-                        <div className="flex items-center gap-1.5 px-2 bg-red-50/50 border border-red-100 rounded-md h-8 cursor-pointer hover:bg-red-50"
-                            onClick={() => {
-                                const col = table.getColumn("dias_atraso_lab")
-                                const current = col?.getFilterValue() as boolean
-                                col?.setFilterValue(current ? undefined : true) // Toggle
-                            }}
-                        >
-                            <input
-                                type="checkbox"
-                                checked={!!table.getColumn("dias_atraso_lab")?.getFilterValue()}
-                                readOnly
-                                className="accent-red-500 w-3.5 h-3.5"
-                            />
-                            <span className="text-xs font-medium text-red-700 select-none">Con Atraso</span>
-                        </div>
                     )}
                 </div>
             </div>

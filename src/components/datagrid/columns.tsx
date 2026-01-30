@@ -78,9 +78,9 @@ const EditableCell = React.memo(({ getValue, row: { index }, column: { id }, tab
                 resize: "none"
             }}
             className={cn(
-                "w-full bg-transparent border-none focus:outline-none focus:ring-1 focus:ring-blue-500 rounded px-1 -mx-1 resize-none overflow-hidden block leading-tight whitespace-pre-wrap py-1 text-zinc-900 placeholder:text-zinc-400",
+                "w-full bg-transparent border-none focus:outline-none focus:ring-1 focus:ring-blue-500 rounded px-1 -mx-1 resize-none overflow-hidden block leading-tight whitespace-pre-wrap py-1 placeholder:text-zinc-400",
                 textSize,
-                className
+                className?.includes('text-') ? className : `text-zinc-900 ${className || ''}`
             )}
         />
     )
@@ -229,7 +229,7 @@ export const columns: ColumnDef<ProgramacionServicio>[] = [
         maxSize: 78,
         enablePinning: true,
         enableResizing: false,
-        cell: ({ getValue }) => <div className="text-zinc-900 font-medium px-2">{getValue() as string}</div>,
+        cell: EditableCell,
     },
     {
         accessorKey: "ot",
@@ -239,7 +239,7 @@ export const columns: ColumnDef<ProgramacionServicio>[] = [
         maxSize: 70,
         enablePinning: true,
         enableResizing: false,
-        cell: ({ getValue }) => <div className="text-zinc-900 font-medium px-2 flex items-center justify-center h-full text-center">{getValue() as string}</div>,
+        cell: EditableCell,
     },
     {
         accessorKey: "codigo_muestra",
@@ -332,12 +332,18 @@ export const columns: ColumnDef<ProgramacionServicio>[] = [
     },
     {
         accessorKey: "estado_trabajo",
-        header: ({ column }) => <SortableHeader column={column} title="ESTADO" />,
-        size: 130,
-        minSize: 100,
-        maxSize: 200,
+        header: ({ column }) => <SortableHeader column={column} title="ESTADO" className="text-base font-semibold" />,
+        size: 180,
+        minSize: 160,
+        maxSize: 280,
         enableResizing: true,
-        cell: StatusCell,
+        cell: ({ getValue, row, column, table }) => (
+            <div className="text-[13px] font-medium">
+                <StatusSelect value={getValue() as string} onChange={(newValue) => {
+                    if (newValue !== getValue()) table.options.meta?.updateData(row.index, column.id, newValue)
+                }} />
+            </div>
+        ),
     },
     {
         accessorKey: "cotizacion_lab",
@@ -350,28 +356,35 @@ export const columns: ColumnDef<ProgramacionServicio>[] = [
     },
     {
         accessorKey: "autorizacion_lab",
-        header: ({ column }) => <SortableHeader column={column} title="AUTORIZADO" className="bg-indigo-50/50 text-indigo-900" />,
-        size: 110,
-        minSize: 90,
+        header: ({ column }) => (
+            <div className="flex flex-col items-center">
+                <SortableHeader column={column} title="AUTORIZADO" className="bg-indigo-50/50 text-indigo-900" />
+                <span className="text-[9px] text-indigo-500 font-medium -mt-1">ADMINISTRACIÓN</span>
+            </div>
+        ),
+        size: 130,
+        minSize: 100,
         maxSize: 200,
         enableResizing: true,
         cell: AutorizacionCell,
     },
     {
         accessorKey: "nota_admin",
-        header: ({ column }) => <SortableHeader column={column} title="NOTA" />,
-        size: 200,
-        minSize: 150,
-        maxSize: 500,
+        header: ({ column }) => <SortableHeader column={column} title="NOTA" className="text-base font-semibold" />,
+        size: 350,
+        minSize: 250,
+        maxSize: 700,
         enableResizing: true,
-        cell: EditableCell,
+        cell: ({ getValue, row, column, table }) => (
+            <EditableCell getValue={getValue} row={row} column={column} table={table} className="text-[13px] text-zinc-900" />
+        ),
     },
     {
         accessorKey: "dias_atraso_lab",
-        header: ({ column }) => <SortableHeader column={column} title="DIAS ATRASO" />,
-        size: 110,
-        minSize: 90,
-        maxSize: 150,
+        header: ({ column }) => <SortableHeader column={column} title={`DIAS\nATRASO`} />,
+        size: 70,
+        minSize: 60,
+        maxSize: 90,
         enableResizing: true,
         filterFn: (row, columnId, filterValue) => {
             if (!filterValue) return true
@@ -406,29 +419,29 @@ export const columns: ColumnDef<ProgramacionServicio>[] = [
     },
     {
         accessorKey: "motivo_dias_atraso_lab",
-        header: ({ column }) => <SortableHeader column={column} title="MOTIVO ATRASO" />,
-        size: 200,
-        minSize: 150,
-        maxSize: 500,
+        header: ({ column }) => <SortableHeader column={column} title={`MOTIVO\nATRASO`} />,
+        size: 180,
+        minSize: 120,
+        maxSize: 300,
         enableResizing: true,
         cell: EditableCell,
     },
     {
         accessorKey: "evidencia_envio_recepcion",
-        header: ({ column }) => <SortableHeader column={column} title="EVIDENCIA RECEP" />,
-        size: 140,
-        minSize: 100,
-        maxSize: 300,
+        header: ({ column }) => <SortableHeader column={column} title={`EVID.\nRECEP`} />,
+        size: 55,
+        minSize: 50,
+        maxSize: 70,
         enableResizing: true,
-        cell: EditableCell,
+        cell: ({ getValue }) => <div className="text-center text-xs font-semibold text-zinc-700">{(getValue() as string) || "..."}</div>,
     },
     {
         accessorKey: "envio_informes",
-        header: ({ column }) => <SortableHeader column={column} title="ENVIO INFORMES" />,
-        size: 140,
-        minSize: 100,
-        maxSize: 300,
+        header: ({ column }) => <SortableHeader column={column} title={`ENVIO\nINF.`} />,
+        size: 55,
+        minSize: 50,
+        maxSize: 70,
         enableResizing: true,
-        cell: EditableCell,
+        cell: ({ getValue }) => <div className="text-center text-xs font-semibold text-zinc-700">{(getValue() as string) || "..."}</div>,
     },
 ]
