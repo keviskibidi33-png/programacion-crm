@@ -15,9 +15,24 @@ declare module "@tanstack/react-table" {
     }
 }
 
+// Utility to format date as DD/MM/YY
+const formatDateToShort = (dateStr: string | null) => {
+    if (!dateStr) return null
+    try {
+        const date = new Date(dateStr)
+        if (isNaN(date.getTime())) return dateStr
+        const day = String(date.getDate()).padStart(2, '0')
+        const month = String(date.getMonth() + 1).padStart(2, '0')
+        const year = String(date.getFullYear()).slice(-2)
+        return `${day}/${month}/${year}`
+    } catch {
+        return dateStr
+    }
+}
+
 interface EditableCellProps<TData> {
     getValue: () => unknown
-    row: { index: number }
+    row: { index: number; original: TData }
     column: { id: string }
     table: Table<TData>
     className?: string
@@ -44,10 +59,10 @@ const EditableCell = React.memo(({ getValue, row: { index }, column: { id }, tab
 
     const isDate = id.includes('fecha') || id === 'entrega_real'
 
-    // Default size if not provided
+    // Force black text color for better contrast
+    const colorClass = "text-zinc-900"
     const textSize = className?.includes('text-') ? '' : 'text-sm'
 
-    // Reverted Boolean Logic: User wants text
     if (isDate) {
         return (
             <input
@@ -57,7 +72,8 @@ const EditableCell = React.memo(({ getValue, row: { index }, column: { id }, tab
                 onBlur={onBlur}
                 onFocus={() => setIsFocused(true)}
                 className={cn(
-                    "w-full bg-transparent border-none focus:outline-none focus:ring-1 focus:ring-blue-500 rounded px-1 -mx-1 h-full text-zinc-900 placeholder:text-zinc-400",
+                    "w-full bg-transparent border-none focus:outline-none focus:ring-1 focus:ring-blue-500 rounded px-1 -mx-1 h-full placeholder:text-zinc-400",
+                    colorClass,
                     textSize,
                     className
                 )}
@@ -73,58 +89,58 @@ const EditableCell = React.memo(({ getValue, row: { index }, column: { id }, tab
             onFocus={() => setIsFocused(true)}
             rows={1}
             style={{
-                fieldSizing: "content", // New CSS property for auto-sizing, fallback needed for older browsers or use effect resizing
+                fieldSizing: "content",
                 minHeight: "1.5em",
                 resize: "none"
             }}
             className={cn(
                 "w-full bg-transparent border-none focus:outline-none focus:ring-1 focus:ring-blue-500 rounded px-1 -mx-1 resize-none overflow-hidden block leading-tight whitespace-pre-wrap py-1 placeholder:text-zinc-400",
+                colorClass,
                 textSize,
-                className?.includes('text-') ? className : `text-zinc-900 ${className || ''}`
+                className
             )}
         />
     )
 })
 EditableCell.displayName = "EditableCell"
 
+// Date Display Component (Shows DD/MM/YY, becomes picker on click)
+const DateDisplayCell = React.memo(({ getValue, row, column, table, className }: EditableCellProps<ProgramacionServicio>) => {
+    const [isEditing, setIsEditing] = React.useState(false)
+    const value = getValue() as string
+    const formatted = formatDateToShort(value)
+
+    if (isEditing) {
+        return (
+            <div onBlur={() => setIsEditing(false)}>
+                <EditableCell getValue={getValue} row={row} column={column} table={table} className={className} />
+            </div>
+        )
+    }
+
+    return (
+        <div
+            onClick={() => setIsEditing(true)}
+            className={cn("w-full h-full cursor-pointer hover:bg-zinc-100/50 flex items-center px-1 text-zinc-900", className)}
+        >
+            {formatted || <span className="text-zinc-300">--/--/--</span>}
+        </div>
+    )
+})
+DateDisplayCell.displayName = "DateDisplayCell"
+
 // Helper for sortable header
 const SortableHeader = ({ column, title, className }: { column: Column<ProgramacionServicio, unknown>, title: string, className?: string }) => {
     return (
         <div
-            className={cn("flex items-center space-x-2 cursor-pointer select-none group hover:bg-slate-100/50 p-1 rounded", className)}
+            className={cn("flex items-center justify-center space-x-2 cursor-pointer select-none group hover:bg-slate-100/50 p-1 rounded", className)}
             onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
         >
-            <span className={cn("font-semibold whitespace-pre-line text-center leading-tight", className ? "text-current" : "text-zinc-700")}>{title}</span>
-            <ArrowUpDown className={cn("ml-2 h-3.5 w-3.5 shrink-0", className ? "text-indigo-300 group-hover:text-indigo-600" : "text-zinc-400 group-hover:text-zinc-700")} />
+            <span className={cn("font-semibold whitespace-pre-line text-center leading-tight text-zinc-800", className)}>{title}</span>
+            <ArrowUpDown className={cn("h-3.5 w-3.5 shrink-0 text-zinc-400 group-hover:text-zinc-700")} />
         </div>
     )
 }
-
-// Status Badge Logic
-const getStatusColor = (status: string) => {
-    const s = status?.toUpperCase() || ""
-    if (s.includes("COMPLETADO") || s.includes("LISTO")) return "bg-emerald-100 text-emerald-800 border-emerald-200"
-    if (s.includes("PROCESO")) return "bg-amber-100 text-amber-800 border-amber-200"
-    if (s.includes("PENDIENTE")) return "bg-slate-100 text-slate-700 border-slate-200"
-    return "bg-white text-zinc-700 border-zinc-200"
-}
-
-const StatusCell = React.memo(({ getValue, row: { index }, column: { id }, table }: EditableCellProps<ProgramacionServicio>) => {
-    const value = getValue() as string
-
-    const onStatusChange = (newValue: string) => {
-        if (newValue !== value) {
-            table.options.meta?.updateData(index, id, newValue)
-        }
-    }
-
-    return (
-        <div className="w-full h-full flex items-center justify-center p-1">
-            <StatusSelect value={value} onChange={onStatusChange} />
-        </div>
-    )
-})
-StatusCell.displayName = "StatusCell"
 
 // Cotizacion Cell (Auto-formats number to COTIZACION-XXX-26)
 const CotizacionCell = React.memo(({ getValue, row: { index }, column: { id }, table }: EditableCellProps<ProgramacionServicio>) => {
@@ -142,7 +158,6 @@ const CotizacionCell = React.memo(({ getValue, row: { index }, column: { id }, t
         }
 
         if (finalValue !== value) {
-            // Update with formatted value
             table.options.meta?.updateData(index, id, finalValue)
         }
     }
@@ -150,7 +165,7 @@ const CotizacionCell = React.memo(({ getValue, row: { index }, column: { id }, t
     const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
         if (e.key === 'Enter') {
             e.preventDefault()
-            e.currentTarget.blur() // This triggers onBlur which handles formatting and saving
+            e.currentTarget.blur()
         }
     }
 
@@ -162,7 +177,7 @@ const CotizacionCell = React.memo(({ getValue, row: { index }, column: { id }, t
                 onChange={e => setInputValue(e.target.value)}
                 onBlur={onBlur}
                 onKeyDown={onKeyDown}
-                className="w-full h-full bg-white border border-blue-300 rounded text-sm p-1"
+                className="w-full h-full bg-white border border-blue-300 rounded text-sm p-1 text-zinc-900"
                 placeholder="Ej: 123"
             />
         )
@@ -174,7 +189,7 @@ const CotizacionCell = React.memo(({ getValue, row: { index }, column: { id }, t
                 setInputValue(value || "")
                 setIsEditing(true)
             }}
-            className="w-full h-full cursor-pointer hover:bg-slate-50 flex items-center px-1 text-sm truncate text-zinc-600"
+            className="w-full h-full cursor-pointer hover:bg-slate-50 flex items-center px-1 text-sm truncate text-zinc-900"
             title={value || "Click para editar"}
         >
             {value || <span className="text-zinc-300 italic">...</span>}
@@ -184,12 +199,9 @@ const CotizacionCell = React.memo(({ getValue, row: { index }, column: { id }, t
 CotizacionCell.displayName = "CotizacionCell"
 
 // Autorizacion Cell (Dropdown)
-// Autorizacion Cell (Dropdown with Admin Logic)
 const AutorizacionCell = React.memo(({ getValue, row: { index }, column: { id }, table }: EditableCellProps<ProgramacionServicio>) => {
     const value = getValue() as string
-
-    // TODO: Connect this to real auth context
-    const isAdmin = true
+    const isAdmin = true // TODO: Connect real auth
 
     const handleChange = (newValue: string) => {
         table.options.meta?.updateData(index, id, newValue)
@@ -208,9 +220,6 @@ const AutorizacionCell = React.memo(({ getValue, row: { index }, column: { id },
 AutorizacionCell.displayName = "AutorizacionCell"
 
 export const columns: ColumnDef<ProgramacionServicio>[] = [
-    // ============================================
-    // COLUMNAS FIJAS - NO REDIMENSIONABLES
-    // ============================================
     {
         accessorKey: "item_numero",
         header: ({ column }) => <SortableHeader column={column} title="ITEM" />,
@@ -219,7 +228,7 @@ export const columns: ColumnDef<ProgramacionServicio>[] = [
         maxSize: 69,
         enablePinning: true,
         enableResizing: false,
-        cell: info => <div className="text-zinc-400 font-mono text-sm text-center">{info.getValue() as string}</div>
+        cell: info => <div className="text-zinc-600 font-mono text-sm text-center">{info.getValue() as string}</div>
     },
     {
         accessorKey: "recep_numero",
@@ -259,7 +268,7 @@ export const columns: ColumnDef<ProgramacionServicio>[] = [
         maxSize: 100,
         enablePinning: true,
         enableResizing: false,
-        cell: EditableCell,
+        cell: DateDisplayCell,
     },
     {
         accessorKey: "fecha_inicio",
@@ -269,7 +278,7 @@ export const columns: ColumnDef<ProgramacionServicio>[] = [
         maxSize: 100,
         enablePinning: true,
         enableResizing: false,
-        cell: EditableCell,
+        cell: DateDisplayCell,
     },
     {
         accessorKey: "fecha_entrega_estimada",
@@ -279,7 +288,7 @@ export const columns: ColumnDef<ProgramacionServicio>[] = [
         maxSize: 100,
         enablePinning: true,
         enableResizing: false,
-        cell: EditableCell,
+        cell: DateDisplayCell,
     },
     {
         accessorKey: "cliente_nombre",
@@ -289,12 +298,9 @@ export const columns: ColumnDef<ProgramacionServicio>[] = [
         maxSize: 94,
         enablePinning: true,
         enableResizing: false,
-        cell: ({ getValue, row, column, table }) => (
-            <div
-                className="line-clamp-2 whitespace-normal leading-tight text-[12.5px]"
-                title={getValue() as string}
-            >
-                <EditableCell getValue={getValue} row={row} column={column} table={table} className="text-[12.5px] leading-3" />
+        cell: (props) => (
+            <div className="line-clamp-2 leading-tight">
+                <EditableCell {...props} className="text-[12.5px] leading-3 text-zinc-900 font-medium" />
             </div>
         )
     },
@@ -306,12 +312,8 @@ export const columns: ColumnDef<ProgramacionServicio>[] = [
         maxSize: 157,
         enablePinning: true,
         enableResizing: false,
-        cell: EditableCell,
+        cell: (props) => <EditableCell {...props} className="text-zinc-900" />,
     },
-
-    // ============================================
-    // COLUMNAS SCROLLABLES - REDIMENSIONABLES
-    // ============================================
     {
         accessorKey: "proyecto",
         header: ({ column }) => <SortableHeader column={column} title="PROYECTO" />,
@@ -319,7 +321,7 @@ export const columns: ColumnDef<ProgramacionServicio>[] = [
         minSize: 100,
         maxSize: 400,
         enableResizing: true,
-        cell: EditableCell,
+        cell: (props) => <EditableCell {...props} className="text-zinc-900" />,
     },
     {
         accessorKey: "entrega_real",
@@ -328,7 +330,7 @@ export const columns: ColumnDef<ProgramacionServicio>[] = [
         minSize: 100,
         maxSize: 300,
         enableResizing: true,
-        cell: EditableCell,
+        cell: DateDisplayCell,
     },
     {
         accessorKey: "estado_trabajo",
@@ -403,12 +405,12 @@ export const columns: ColumnDef<ProgramacionServicio>[] = [
             estimated.setHours(0, 0, 0, 0)
             real.setHours(0, 0, 0, 0)
 
-            if (!realDateStr && real <= estimated) {
-                return <div className="text-zinc-400 text-center font-mono">0</div>
-            }
-
             const diffTime = real.getTime() - estimated.getTime()
             const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+
+            if (!realDateStr && diffDays <= 0) {
+                return <div className="text-zinc-600 text-center font-mono">0</div>
+            }
 
             return (
                 <div className={`text-center font-mono ${diffDays > 0 ? "text-red-600 font-bold" : "text-green-600"}`}>
@@ -424,7 +426,7 @@ export const columns: ColumnDef<ProgramacionServicio>[] = [
         minSize: 120,
         maxSize: 300,
         enableResizing: true,
-        cell: EditableCell,
+        cell: (props) => <EditableCell {...props} className="text-zinc-900" />,
     },
     {
         accessorKey: "evidencia_envio_recepcion",
@@ -433,7 +435,7 @@ export const columns: ColumnDef<ProgramacionServicio>[] = [
         minSize: 50,
         maxSize: 70,
         enableResizing: true,
-        cell: ({ getValue }) => <div className="text-center text-xs font-semibold text-zinc-700">{(getValue() as string) || "..."}</div>,
+        cell: ({ getValue }) => <div className="text-center text-xs font-semibold text-zinc-900">{(getValue() as string) || "..."}</div>,
     },
     {
         accessorKey: "envio_informes",
@@ -442,6 +444,6 @@ export const columns: ColumnDef<ProgramacionServicio>[] = [
         minSize: 50,
         maxSize: 70,
         enableResizing: true,
-        cell: ({ getValue }) => <div className="text-center text-xs font-semibold text-zinc-700">{(getValue() as string) || "..."}</div>,
+        cell: ({ getValue }) => <div className="text-center text-xs font-semibold text-zinc-900">{(getValue() as string) || "..."}</div>,
     },
 ]

@@ -7,14 +7,27 @@
 - Domain name ready (e.g., `programacion.geofal.com.pe`)
 - GitHub repository access
 
-### Environment Variables
+## 1. Environment Configuration
 
-Set these in Coolify before deployment:
-
-```env
+### Frontend (.env.local)
+```text
 NEXT_PUBLIC_SUPABASE_URL=https://db.geofal.com.pe
-NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJzdXBhYmFzZSIsImlhdCI6MTc2ODY2MDY4MCwiZXhwIjo0OTI0MzM0MjgwLCJyb2xlIjoiYW5vbiJ9.4z7Le-pgOQJXXkW51BxJ7-n-4rRZ64iTZmlWadXN2fE
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
 ```
+
+### Main CRM (.env.local)
+Update the following variable in the main `crm-geofal` project:
+```text
+NEXT_PUBLIC_PROGRAMACION_URL=http://localhost:8472
+```
+
+## 2. Port Configuration
+The project is configured to run on port **8472**.
+
+## 3. Database Fixes (Important)
+To allow data creation and automated calculations, execute the content of `supabase_fix.sql` in the Supabase SQL Editor. This will:
+1. Enable `anon` role to INSERT/UPDATE/SELECT for local/iframe testing.
+2. Add a trigger to automatically calculate `dias_atraso_lab` whenever dates change.
 
 ### Coolify Configuration Steps
 
