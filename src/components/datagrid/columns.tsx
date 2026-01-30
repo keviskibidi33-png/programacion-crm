@@ -435,7 +435,7 @@ export const columns: ColumnDef<ProgramacionServicio>[] = [
         minSize: 50,
         maxSize: 70,
         enableResizing: true,
-        cell: ({ getValue }) => <div className="text-center text-xs font-semibold text-zinc-900">{(getValue() as string) || "..."}</div>,
+        cell: (props) => <EditableCell {...props} className="text-center text-[11px] font-bold text-zinc-900 uppercase" />,
     },
     {
         accessorKey: "envio_informes",
@@ -444,6 +444,6 @@ export const columns: ColumnDef<ProgramacionServicio>[] = [
         minSize: 50,
         maxSize: 70,
         enableResizing: true,
-        cell: ({ getValue }) => <div className="text-center text-xs font-semibold text-zinc-900">{(getValue() as string) || "..."}</div>,
+        cell: (props) => <EditableCell {...props} className="text-center text-[11px] font-bold text-zinc-900 uppercase" />,
     },
 ]
