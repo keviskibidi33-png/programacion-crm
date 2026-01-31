@@ -12,6 +12,7 @@ import {
     SortingState,
     ColumnFiltersState,
     VisibilityState,
+    RowData,
 } from "@tanstack/react-table"
 import { useVirtualizer } from "@tanstack/react-virtual"
 import { cn } from "@/lib/utils"
@@ -25,12 +26,21 @@ import {
 } from "lucide-react"
 import { GhostRow } from "./ghost-row"
 
+// Extend TableMeta to include our custom properties
+declare module '@tanstack/react-table' {
+    interface TableMeta<TData extends RowData> {
+        updateData: (rowId: string, columnId: string, value: unknown) => void
+        userRole?: string
+    }
+}
+
 interface DataTableProps<TData, TValue> {
     columns: ColumnDef<TData, TValue>[]
     data: TData[]
     loading?: boolean
     onUpdate?: (rowId: string, field: string, value: unknown) => void
     onInsert?: (data: Partial<TData>) => Promise<void>
+    userRole?: string
 }
 
 export function DataTable<TData, TValue>({
@@ -38,7 +48,8 @@ export function DataTable<TData, TValue>({
     data,
     loading,
     onUpdate,
-    onInsert
+    onInsert,
+    userRole
 }: DataTableProps<TData, TValue>) {
     const [sorting, setSorting] = React.useState<SortingState>([])
     const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
@@ -77,7 +88,7 @@ export function DataTable<TData, TValue>({
                     "fecha_inicio",
                     "fecha_entrega_estimada",
                     "cliente_nombre",
-                    "descripcion_servicio"
+                    "proyecto"
                 ]
             }
         },
@@ -87,13 +98,12 @@ export function DataTable<TData, TValue>({
         onColumnVisibilityChange: setColumnVisibility,
         onPaginationChange: setPagination,
         meta: {
-            updateData: (rowIndex: number, columnId: string, value: unknown) => {
-                // Call Hybrid Hook via prop
-                const row = data[rowIndex] as { id: string }
-                if (row?.id && onUpdate) {
-                    onUpdate(row.id, columnId, value)
+            updateData: (rowId: string, columnId: string, value: unknown) => {
+                if (rowId && onUpdate) {
+                    onUpdate(rowId, columnId, value)
                 }
             },
+            userRole: userRole || '',
         },
     })
 
@@ -112,25 +122,50 @@ export function DataTable<TData, TValue>({
         <div className="flex flex-col h-full bg-white font-sans text-sm">
             {/* Toolbar Area */}
             <div className="flex items-center justify-between p-2 border-b border-zinc-200 bg-white gap-2">
-                <div className="flex items-center gap-2 flex-1">
+                <div className="flex items-center gap-2 flex-1 flex-wrap">
                     <input
                         placeholder="Buscar en todo..."
                         value={globalFilter ?? ""}
                         onChange={(event) => setGlobalFilter(event.target.value)}
-                        className="h-8 w-[200px] lg:w-[300px] border border-zinc-200 rounded-md px-3 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 bg-zinc-50 text-zinc-900 placeholder:text-zinc-400"
+                        className="h-8 w-[200px] lg:w-[250px] border border-zinc-200 rounded-md px-3 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 bg-zinc-50 text-zinc-900 placeholder:text-zinc-400"
                     />
 
                     {/* Status Filter */}
                     {table.getAllColumns().find(c => c.id === "estado_trabajo") && (
                         <select
-                            className="h-8 border border-zinc-200 rounded-md px-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white text-zinc-900"
+                            className="h-8 border border-zinc-200 rounded-md px-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white text-zinc-900 cursor-pointer hover:bg-zinc-50"
                             onChange={e => table.getColumn("estado_trabajo")?.setFilterValue(e.target.value === "TODOS" ? "" : e.target.value)}
                         >
                             <option value="TODOS">Estado: Todos</option>
                             <option value="PENDIENTE">Pendiente</option>
                             <option value="PROCESO">En Proceso</option>
-                            <option value="COMPLETADO">Completado</option>
+                            <option value="INFORME LISTO">Informe Listo</option>
                             <option value="ENTREGADO">Entregado</option>
+                        </select>
+                    )}
+
+                    {/* Authorization Filter (Admin/Lab) */}
+                    {table.getAllColumns().find(c => c.id === "autorizacion_lab") && (
+                        <select
+                            className="h-8 border border-zinc-200 rounded-md px-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 bg-indigo-50 text-indigo-900 cursor-pointer hover:bg-indigo-100 font-medium"
+                            onChange={e => table.getColumn("autorizacion_lab")?.setFilterValue(e.target.value === "TODOS" ? "" : e.target.value)}
+                        >
+                            <option value="TODOS">Autorización: Todas</option>
+                            <option value="ENTREGADO">Entregado</option>
+                            <option value="NO ENTREGADO">No Entregado</option>
+                        </select>
+                    )}
+
+                    {/* Payment Status Filter (Admin) - Using 'envio_informes' as field */}
+                    {table.getAllColumns().find(c => c.id === "envio_informes") && (
+                        <select
+                            className="h-8 border border-zinc-200 rounded-md px-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 bg-emerald-50 text-emerald-900 cursor-pointer hover:bg-emerald-100 font-medium"
+                            onChange={e => table.getColumn("envio_informes")?.setFilterValue(e.target.value === "TODOS" ? "" : e.target.value)}
+                        >
+                            <option value="TODOS">Pago: Todos</option>
+                            <option value="PENDIENTE">Pendiente</option>
+                            <option value="EN PROCESO">En Proceso</option>
+                            <option value="PAGADO">Pagado</option>
                         </select>
                     )}
                 </div>
@@ -144,8 +179,8 @@ export function DataTable<TData, TValue>({
                 style={{ height: '100%', contain: 'strict', zoom: '85%' }}
             >
                 <table
-                    className="border-separate border-spacing-0"
-                    style={{ width: table.getTotalSize() }}
+                    className="border-collapse"
+                    style={{ width: table.getTotalSize(), tableLayout: 'fixed' }}
                 >
                     <thead className="sticky top-0 z-40 bg-white shadow-sm h-10 text-sm">
                         {table.getHeaderGroups().map((headerGroup) => (
@@ -162,12 +197,11 @@ export function DataTable<TData, TValue>({
                                                 left: isPinned ? header.column.getStart("left") : undefined,
                                                 position: isPinned ? "sticky" : "relative",
                                                 zIndex: isPinned ? 20 : 0,
+                                                boxSizing: "border-box",
                                             }}
                                             className={cn(
-                                                "px-2 py-2 text-left bg-[#f4f4f5] select-none relative group", // Explicit bg-zinc-100 hex
-                                                isPinned
-                                                    ? "shadow-[inset_-1px_0_0_0_#e4e4e7]"
-                                                    : "border-r border-zinc-200",
+                                                "px-2 py-2 text-left bg-[#f4f4f5] select-none relative group",
+                                                isPinned ? "shadow-[inset_-1px_0_0_0_#d4d4d8]" : "shadow-[inset_-1px_0_0_0_#e4e4e7]",
                                                 isLastPinned && "shadow-[inset_-1px_0_0_0_#d4d4d8,4px_0_5px_-2px_rgba(0,0,0,0.1)]"
                                             )}
                                         >
@@ -179,8 +213,6 @@ export function DataTable<TData, TValue>({
                         ))}
                     </thead>
                     <tbody className="bg-white">
-                        {/* Ghost Row - Always at top of body */}
-                        {onInsert && <GhostRow table={table} onInsert={onInsert} />}
 
                         {/* Virtual Items */}
                         {rowVirtualizer.getVirtualItems().length === 0 ? (
@@ -211,28 +243,28 @@ export function DataTable<TData, TValue>({
                                                 // Removed fixed height logic, let content drive height
                                             }}
                                         >
-                                            {row.getVisibleCells().map((cell, cellIndex) => { // Added cellIndex
+                                            {row.getVisibleCells().map((cell) => {
                                                 const isPinned = cell.column.getIsPinned()
                                                 const isLastPinned = isPinned === "left" && cell.column.id === "descripcion_servicio"
-                                                const isEvenCol = cellIndex % 2 === 0
+                                                const isEvenRow = virtualRow.index % 2 === 0
 
                                                 return (
                                                     <td
                                                         key={cell.id}
                                                         style={{
                                                             width: cell.column.getSize(),
-                                                            left: isPinned ? cell.column.getStart("left") : undefined, // Must match header
+                                                            left: isPinned ? cell.column.getStart("left") : undefined,
                                                             position: isPinned ? "sticky" : "relative",
                                                             zIndex: isPinned ? 10 : 0,
+                                                            boxSizing: "border-box",
                                                         }}
                                                         className={cn(
-                                                            "px-2 py-1.5 align-middle border-b border-zinc-100", // Centered content + row border
-                                                            // Column Striping Logic
+                                                            "px-2 py-1.5 align-middle",
                                                             isPinned
-                                                                ? (isEvenCol ? "bg-blue-50 hover:!bg-blue-200" : "bg-white hover:!bg-blue-200") // Solid for pinned + Cell Hover
-                                                                : (isEvenCol ? "bg-blue-50/80 hover:!bg-blue-200" : "bg-white hover:!bg-blue-200"), // Slightly translucent + Cell Hover
-                                                            "border-r border-zinc-100",
-                                                            isLastPinned && "shadow-[inset_-1px_0_0_0_#e4e4e7,4px_0_5px_-2px_rgba(0,0,0,0.05)]"
+                                                                ? (isEvenRow ? "bg-blue-50 hover:!bg-blue-200" : "bg-white hover:!bg-blue-200")
+                                                                : (isEvenRow ? "bg-blue-50/80 hover:!bg-blue-200" : "bg-white hover:!bg-blue-200"),
+                                                            isPinned ? "shadow-[inset_-1px_0_0_0_#d4d4d8,0_1px_0_0_#e4e4e7]" : "shadow-[inset_-1px_0_0_0_#e4e4e7,0_1px_0_0_#e4e4e7]",
+                                                            isLastPinned && "shadow-[inset_-1px_0_0_0_#d4d4d8,0_1px_0_0_#e4e4e7,4px_0_5px_-2px_rgba(0,0,0,0.05)]"
                                                         )}
                                                     >
                                                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
@@ -253,6 +285,9 @@ export function DataTable<TData, TValue>({
                                 )}
                             </>
                         )}
+
+                        {/* Ghost Row - At bottom like Excel */}
+                        {onInsert && <GhostRow table={table} onInsert={onInsert} />}
                     </tbody>
                 </table>
             </div>

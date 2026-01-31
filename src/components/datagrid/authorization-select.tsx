@@ -18,8 +18,8 @@ interface AuthorizationSelectProps {
 }
 
 const DEFAULT_AUTH_OPTIONS: SelectOption[] = [
-    { value: "APROBADO", label: "APROBADO", color: "bg-green-100 text-green-800 border-green-200 hover:bg-green-200" },
-    { value: "RECHAZADO", label: "RECHAZADO", color: "bg-red-50 text-red-800 border-red-100 hover:bg-red-100" },
+    { value: "ENTREGADO", label: "ENTREGADO", color: "bg-green-100 text-green-800 border-green-200 hover:bg-green-200" },
+    { value: "NO ENTREGADO", label: "NO ENTREGADO", color: "bg-red-50 text-red-800 border-red-100 hover:bg-red-100" },
 ]
 
 export function AuthorizationSelect({ value, onChange, disabled, options = DEFAULT_AUTH_OPTIONS }: AuthorizationSelectProps) {
@@ -72,7 +72,7 @@ export function AuthorizationSelect({ value, onChange, disabled, options = DEFAU
                         activeColor
                     )}
                 >
-                    {value || "PENDIENTE"}
+                    {value || "-"}
                 </div>
             </div>
         )
@@ -88,7 +88,7 @@ export function AuthorizationSelect({ value, onChange, disabled, options = DEFAU
                     isOpen && "ring-2 ring-blue-400 ring-offset-1"
                 )}
             >
-                {value || "PENDIENTE"}
+                {value || "-"}
             </div>
 
             {isOpen && (

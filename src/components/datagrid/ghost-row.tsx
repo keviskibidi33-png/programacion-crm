@@ -48,16 +48,92 @@ export function GhostRow<TData>({ table, onInsert }: GhostRowProps<TData>) {
         }
 
         if (columnId === 'ot') {
-            // Append -26 LEM if only digits are entered
+            // Append -26 if only digits are entered (no LEM)
             if (/^\d+$/.test(formatted)) {
-                formatted = `${formatted}-26 LEM`
+                formatted = `${formatted}-26`
             }
         }
 
         if (columnId === 'cotizacion_lab') {
-            // Append COTIZACION-XXX-26 if only digits are entered
+            // Append COTIZ.N-XXX-26 if only digits are entered
             if (/^\d+$/.test(formatted)) {
-                formatted = `COTIZACION-${formatted}-26`
+                formatted = `COTIZ.N-${formatted}-26`
+            }
+        }
+
+        if (columnId === 'numero_factura') {
+            // FXXX-XXXX logic
+            if (/^\d+$/.test(formatted)) {
+                const paddedNum = formatted.length < 4 ? formatted.padStart(4, '0') : formatted
+                formatted = `F001-${paddedNum}`
+            } else if (/^(\d+)-(\d+)$/.test(formatted)) {
+                const match = formatted.match(/^(\d+)-(\d+)$/)
+                if (match) {
+                    formatted = `F${match[1].padStart(3, '0')}-${match[2].padStart(4, '0')}`
+                }
+            } else if (/^[fF]\d+$/.test(formatted)) {
+                const nums = formatted.slice(1)
+                const paddedNum = nums.length < 4 ? nums.padStart(4, '0') : nums
+                formatted = `F001-${paddedNum}`
+            }
+        }
+
+
+        // Date fields: auto-complete to show DD/MM/YY format (store ISO internally for DB)
+        const isDateField = ['fecha_recepcion', 'fecha_inicio', 'fecha_entrega_estimada', 'entrega_real', 'fecha_solicitud_com', 'fecha_entrega_com', 'fecha_pago'].includes(columnId)
+        if (isDateField && formatted) {
+            let day = ''
+            let month = ''
+            let yearFull = '2026'
+            let yearShort = '26'
+
+            if (/^\d{4}$/.test(formatted)) {
+                // 1212 → 12/12/26
+                day = formatted.slice(0, 2)
+                month = formatted.slice(2, 4)
+            } else if (/^\d{6}$/.test(formatted)) {
+                // 121226 → 12/12/26
+                day = formatted.slice(0, 2)
+                month = formatted.slice(2, 4)
+                yearShort = formatted.slice(4, 6)
+                yearFull = `20${yearShort}`
+            } else if (/^\d{8}$/.test(formatted)) {
+                // 12122026 → 12/12/2026
+                day = formatted.slice(0, 2)
+                month = formatted.slice(2, 4)
+                yearFull = formatted.slice(4, 8)
+                yearShort = yearFull.slice(-2)
+            } else if (/^\d{3}$/.test(formatted)) {
+                // 512 → 05/12/26
+                day = formatted.slice(0, 1).padStart(2, '0')
+                month = formatted.slice(1, 3)
+            } else if (!formatted.includes('-')) {
+                const parts = formatted.split(/[./-]/)
+                if (parts.length === 2) {
+                    day = parts[0]
+                    month = parts[1]
+                } else if (parts.length === 3) {
+                    day = parts[0]
+                    month = parts[1]
+                    let y = parts[2]
+                    if (y.length === 2) {
+                        yearShort = y; yearFull = `20${y}`
+                    } else {
+                        yearFull = y; yearShort = y.slice(-2)
+                    }
+                }
+            }
+
+            if (day && month) {
+                day = day.padStart(2, '0')
+                month = month.padStart(2, '0')
+                formatted = `${day}/${month}/${yearShort}`
+                setNewData(prev => ({
+                    ...prev,
+                    [columnId]: formatted,
+                    [`_${columnId}_iso`]: `${yearFull}-${month}-${day}`
+                }))
+                return
             }
         }
 
@@ -66,50 +142,106 @@ export function GhostRow<TData>({ table, onInsert }: GhostRowProps<TData>) {
         }
     }
 
-    const handleKeyDown = async (e: React.KeyboardEvent) => {
+    // Navigate between fields with Enter, submit with Ctrl+Enter
+    const handleKeyDown = async (e: React.KeyboardEvent<HTMLInputElement>) => {
         if (e.key === 'Enter') {
             e.preventDefault()
 
-            // Validation
-            const validationPayload = {
-                recep_numero: newData['recep_numero' as keyof TData],
-                ot: newData['ot' as keyof TData]
+            // Ctrl+Enter = Submit
+            if (e.ctrlKey) {
+                await submitRow()
+                return
             }
 
-            // Only validate strict fields if they are entered (or make them required?)
-            // Assuming required for Insert based on user plan
-            // We can validate partial schema match
-            try {
-                // Manually checking specific fields for this specific row type
-                // In a generic component we'd need column-specific validation rules passed in
-                // For now, hardcoding as per "Specialized Ghost Row" plan
-                const result = insertSchema.safeParse(validationPayload)
+            // Regular Enter = Navigate to next field
+            const allInputs = Array.from(document.querySelectorAll('.ghost-row-input')) as HTMLInputElement[]
+            const currentElement = e.currentTarget
+            const currentIndex = allInputs.indexOf(currentElement)
 
-                if (!result.success) {
-                    const formattedErrors: Record<string, string> = {}
-                    result.error.issues.forEach(issue => {
-                        formattedErrors[issue.path[0] as string] = issue.message
-                    })
-                    setErrors(formattedErrors)
-                    return
-                }
-
-                // Submit
-                setIsSubmitting(true)
-                await onInsert(newData)
-                setNewData({}) // Reset
-                setErrors({})
-            } catch (error) {
-                console.error("Insert error", error)
-            } finally {
-                setIsSubmitting(false)
+            if (currentIndex !== -1 && currentIndex < allInputs.length - 1) {
+                // Move to next field
+                allInputs[currentIndex + 1].focus()
+                allInputs[currentIndex + 1].select()
+            } else {
+                // Last field - submit the row
+                await submitRow()
             }
         }
     }
 
+    const submitRow = async () => {
+        // Validation
+        const validationPayload = {
+            recep_numero: newData['recep_numero' as keyof TData],
+            ot: newData['ot' as keyof TData]
+        }
+
+        try {
+            const result = insertSchema.safeParse(validationPayload)
+
+            if (!result.success) {
+                const formattedErrors: Record<string, string> = {}
+                result.error.issues.forEach(issue => {
+                    formattedErrors[issue.path[0] as string] = issue.message
+                })
+                setErrors(formattedErrors)
+                return
+            }
+
+            // Submit
+            setIsSubmitting(true)
+
+            // Convert display dates to ISO format for database
+            const dateFields = ['fecha_recepcion', 'fecha_inicio', 'fecha_entrega_estimada', 'entrega_real']
+            const submitData = { ...newData }
+            for (const field of dateFields) {
+                const isoKey = `_${field}_iso` as keyof TData
+                if (submitData[isoKey as keyof typeof submitData]) {
+                    (submitData as Record<string, unknown>)[field] = submitData[isoKey as keyof typeof submitData]
+                    delete (submitData as Record<string, unknown>)[isoKey as string]
+                }
+            }
+
+            await onInsert(submitData)
+            setNewData({}) // Reset
+            setErrors({})
+        } catch (error) {
+            console.error("Insert error", error)
+        } finally {
+            setIsSubmitting(false)
+        }
+    }
+
+    // Get column header titles for placeholders
+    const getPlaceholder = (colId: string): string => {
+        const placeholders: Record<string, string> = {
+            item_numero: "Auto",
+            recep_numero: "Recepción",
+            ot: "OT #",
+            codigo_muestra: "Código",
+            cliente_nombre: "Cliente",
+            proyecto: "Proyecto",
+            descripcion_servicio: "Descripción",
+            fecha_recepcion: "DDMM",
+            fecha_inicio: "DDMM",
+            fecha_entrega: "DDMM",
+            entrega_real: "DDMM",
+            cotizacion_lab: "COTIZ.N-XX-26",
+            numero_factura: "FXXX-XXXX",
+            estado_trabajo: "Estado",
+            dias_atraso_lab: "0",
+            dias_atraso_envio_coti: "0",
+            nota_lab: "Nota...",
+            autorizacion_lab: "-",
+            envio_informes: "-",
+            estado_pago: "PENDIENTE",
+        }
+        return placeholders[colId] || "..."
+    }
+
     return (
-        <tr className="bg-blue-50 border-b-2 border-blue-100 sticky top-[40px] z-30 shadow-sm">
-            {table.getAllLeafColumns().map((column) => {
+        <tr className="group hover:bg-blue-100/50 transition-colors">
+            {table.getAllLeafColumns().map((column, colIndex) => {
                 const isPinned = column.getIsPinned()
                 const isLastPinned = isPinned === "left" && column.id === "descripcion_servicio"
                 const colId = column.id
@@ -123,64 +255,54 @@ export function GhostRow<TData>({ table, onInsert }: GhostRowProps<TData>) {
                 const isAutorizacion = colId === 'autorizacion_lab'
                 const isDate = colId.includes('fecha') || colId === 'entrega_real'
 
+                // Common TD styles matching data-table.tsx
+                const tdStyle = {
+                    width: column.getSize(),
+                    left: isPinned ? column.getStart("left") : undefined,
+                    position: isPinned ? "sticky" as const : "relative" as const,
+                    zIndex: isPinned ? 15 : 0,
+                    boxSizing: "border-box" as const,
+                }
+
+                const tdClassName = cn(
+                    "px-2 py-1.5 align-middle",
+                    isPinned ? "bg-white hover:!bg-blue-200" : "bg-white",
+                    isPinned ? "shadow-[inset_-1px_0_0_0_#d4d4d8,0_1px_0_0_#e4e4e7]" : "shadow-[inset_-1px_0_0_0_#e4e4e7,0_1px_0_0_#e4e4e7]",
+                    isLastPinned && "shadow-[inset_-1px_0_0_0_#d4d4d8,0_1px_0_0_#e4e4e7,4px_0_5px_-2px_rgba(0,0,0,0.05)]"
+                )
+
                 if (isAutorizacion) {
-                    // Skip rendering input for Autorizacion in Ghost Row (it's admin only later)
                     return (
-                        <td
-                            key={`ghost-${colId}`}
-                            style={{
-                                width: column.getSize(),
-                                left: isPinned ? column.getStart("left") : undefined,
-                                position: isPinned ? "sticky" : "relative",
-                                zIndex: isPinned ? 35 : 0,
-                            }}
-                            className={cn(
-                                "px-2 py-1.5 truncate p-0 bg-zinc-50/50 border-r border-zinc-100", // Greyed out
-                            )}
-                        >
-                            <div className="w-full text-center text-zinc-300 text-[10px] select-none">BLOQUEADO</div>
+                        <td key={`ghost-${colId}`} style={tdStyle} className={tdClassName}>
+                            <div className="w-full text-center text-zinc-300 text-[10px] select-none italic">-</div>
                         </td>
                     )
                 }
 
                 return (
-                    <td
-                        key={`ghost-${colId}`}
-                        style={{
-                            width: column.getSize(),
-                            left: isPinned ? column.getStart("left") : undefined,
-                            position: isPinned ? "sticky" : "relative",
-                            zIndex: isPinned ? 35 : 0, // Higher than rows, lower than header
-                        }}
-                        className={cn(
-                            "px-2 py-1.5 truncate p-0",
-                            isPinned
-                                ? "bg-[#eff6ff] shadow-[inset_-1px_0_0_0_#93c5fd]" // explicit solid hex for blue-50
-                                : "bg-[#eff6ff] border-r border-blue-100",
-                            isLastPinned && "shadow-[inset_-1px_0_0_0_#93c5fd,4px_0_5px_-2px_rgba(0,0,0,0.05)]"
-                        )}
-                    >
+                    <td key={`ghost-${colId}`} style={tdStyle} className={tdClassName}>
                         {isReadOnly ? (
-                            <div className="px-2 text-zinc-500 italic text-xs font-semibold">Auto</div>
+                            <div className="px-1 text-zinc-400 italic text-xs font-semibold">+</div>
                         ) : isStatus ? (
-                            <div className="w-full h-full flex items-center justify-center p-1">
+                            <div className="w-full h-full flex items-center justify-center">
                                 <StatusSelect value={value as string} onChange={(val) => handleChange(colId, val)} />
                             </div>
                         ) : (
                             <input
-                                type={isNumeric ? "number" : isDate ? "date" : "text"}
+                                type={isNumeric ? "number" : "text"}
                                 className={cn(
-                                    "w-full bg-transparent border-none focus:outline-none text-sm placeholder:text-zinc-400 h-full px-2 font-medium text-zinc-900", // Darker text, standard placeholder
-                                    error && "bg-red-50 text-red-900 ring-1 ring-inset ring-red-500 placeholder:text-red-300",
+                                    "ghost-row-input w-full bg-transparent border-none focus:outline-none focus:ring-1 focus:ring-blue-400 rounded text-sm h-full px-1 font-medium text-zinc-900",
+                                    "placeholder:text-zinc-300 placeholder:italic",
+                                    error && "bg-red-50 text-red-900 ring-1 ring-inset ring-red-500 placeholder:text-red-400",
                                     isSubmitting && "opacity-50 cursor-wait"
                                 )}
-                                placeholder={error ? error : "..."}
+                                placeholder={error ? error : getPlaceholder(colId)}
                                 value={value}
                                 onChange={(e) => handleChange(colId, e.target.value)}
                                 onBlur={(e) => handleBlur(colId, e.target.value)}
                                 onKeyDown={handleKeyDown}
                                 disabled={isSubmitting}
-                                title={error}
+                                title={error || `Ingrese ${getPlaceholder(colId)}`}
                             />
                         )}
                     </td>
