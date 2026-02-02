@@ -40,8 +40,12 @@ export function useCurrentUser() {
                 const userRole = data.role.toLowerCase()
                 setRole(userRole)
 
-                // Extract permissions from the join
-                const perms = (data as any).role_definitions?.permissions || {}
+                // Extract permissions from the join (handle potential array)
+                const roleDef = Array.isArray((data as any).role_definitions)
+                    ? (data as any).role_definitions[0]
+                    : (data as any).role_definitions
+
+                const perms = roleDef?.permissions || {}
                 setPermissions(perms)
 
                 // Determine allowed views and granular write access
