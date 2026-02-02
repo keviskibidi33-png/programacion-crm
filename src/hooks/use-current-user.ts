@@ -46,6 +46,7 @@ export function useCurrentUser() {
                     : (data as any).role_definitions
 
                 const perms = roleDef?.permissions || {}
+                console.log(`[DEBUG] User profile role: ${userRole}`, { perms })
                 setPermissions(perms)
 
                 // Determine allowed views and granular write access
