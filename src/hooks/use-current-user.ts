@@ -11,11 +11,16 @@ export function useCurrentUser() {
 
     // We expect "userId" in the iframe URL
     const userIdParam = searchParams.get("userId")
+    const urlRole = searchParams.get("role")
+    const urlCanWrite = searchParams.get("canWrite") === "true"
 
-    const [role, setRole] = useState<string | null>(null)
+    const [role, setRole] = useState<string | null>(urlRole?.toLowerCase() || null)
     const [loading, setLoading] = useState(true)
-    const [allowedViews, setAllowedViews] = useState<ViewMode[]>([])
-    const [permissions, setPermissions] = useState<any>(null)
+    const [allowedViews, setAllowedViews] = useState<ViewMode[]>(urlRole ? ["LAB"] : [])
+    const [permissions, setPermissions] = useState<any>(urlRole ? {
+        laboratorio: { read: true, write: urlCanWrite, delete: false },
+        programacion: { read: true, write: urlCanWrite, delete: false }
+    } : null)
 
     useEffect(() => {
         async function fetchRole() {
@@ -32,7 +37,7 @@ export function useCurrentUser() {
                     .single()
 
                 if (error || !data) {
-                    setRole(null)
+                    console.log("[Auth] Error or no data from Supabase (maybe RLS?), keeping URL fallbacks")
                     setLoading(false)
                     return
                 }
