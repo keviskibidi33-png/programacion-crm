@@ -48,29 +48,56 @@ const EditableCell = React.memo(({ getValue, row: { index, original }, column: {
     const [value, setValue] = React.useState(initialValue)
     const [isFocused, setIsFocused] = React.useState(false)
 
-    // --- Granular Permissions Layer ("The Security Guard") ---
+    // --- Column-Based Permissions by Role ---
     const meta = table.options.meta as any
-    const permissions = meta?.permissions
-    const userRole = meta?.userRole?.toLowerCase() || ""
-    const isAdmin = userRole.includes("admin") || userRole.includes("gerencia")
+    const userRole = (meta?.userRole || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
 
-    // Determine the area of this column to check the specific permission
-    const commercialFields = ["cotizacion_lab"]
-    const adminFields = ["autorizacion_lab", "estado_pago", "nota_admin"]
+    // Role-based column restrictions
+    // lector = NO puede editar NADA
+    // tipificador = Puede editar TODO excepto cotizacion_lab, autorizacion_lab
+    // vendor = Puede editar TODO excepto estado_pago
+    // administrativo = Puede editar TODO excepto cotizacion_lab
+    // admin = Puede editar TODO
 
-    let canWrite = meta?.canWrite ?? false // Global override (from URL/Admin)
+    const getCanWriteColumn = (): boolean => {
+        // If global canWrite is explicitly false, block everything
+        const globalCanWrite = meta?.canWrite
 
-    // If not already forced by Admin/URL, check the specific module in the matrix
-    if (!canWrite && permissions) {
-        if (commercialFields.includes(id)) {
-            canWrite = permissions.comercial?.write || false
-        } else if (adminFields.includes(id)) {
-            canWrite = permissions.administracion?.write || false
-        } else {
-            // Default to Laboratorio/Programacion area
-            canWrite = permissions.laboratorio?.write || permissions.programacion?.write || false
+        // Superadmin always can write everything
+        if (userRole === 'admin') return true
+
+        // Role: laboratorio_lector - Cannot edit anything
+        if (userRole === 'laboratorio_lector' || userRole.includes('lector')) {
+            return false
         }
+
+        // Role: laboratorio_tipificador - Can edit everything EXCEPT cotizacion_lab, autorizacion_lab
+        if (userRole === 'laboratorio_tipificador' || (userRole.includes('laboratorio') && userRole.includes('tipificador'))) {
+            const blockedColumns = ['cotizacion_lab', 'autorizacion_lab']
+            if (blockedColumns.includes(id)) return false
+            return true
+        }
+
+        // Role: vendor (vendedor) - Can edit everything EXCEPT estado_pago
+        if (userRole === 'vendor' || userRole.includes('vendedor') || userRole.includes('asesor') || userRole.includes('comercial')) {
+            const blockedColumns = ['estado_pago']
+            if (blockedColumns.includes(id)) return false
+            return true
+        }
+
+        // Role: administrativo - Can edit everything EXCEPT cotizacion_lab
+        if (userRole === 'administrativo') {
+            const blockedColumns = ['cotizacion_lab']
+            if (blockedColumns.includes(id)) return false
+            return true
+        }
+
+        // Default: use global canWrite from permissions
+        return globalCanWrite ?? false
     }
+
+    const canWrite = getCanWriteColumn()
+
 
     // Sync external changes
     React.useEffect(() => {
@@ -171,9 +198,19 @@ const OTCell = React.memo(({ getValue, row: { index, original }, column: { id },
         setValue(cleanValue(rawValue))
     }, [rawValue])
 
-    // Permission check (OT belongs to Laboratorio)
+    // Permission check - Column-based restrictions by role
     const meta = table.options.meta as any
-    const canWrite = meta?.canWrite || meta?.permissions?.laboratorio?.write || meta?.permissions?.programacion?.write || false
+    const userRole = (meta?.userRole || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+
+    const getCanWriteColumn = (): boolean => {
+        if (userRole === 'admin') return true
+        if (userRole === 'laboratorio_lector' || userRole.includes('lector')) return false
+        if (userRole === 'laboratorio_tipificador' || (userRole.includes('laboratorio') && userRole.includes('tipificador'))) return true
+        if (userRole === 'vendor' || userRole.includes('vendedor') || userRole.includes('asesor') || userRole.includes('comercial')) return true
+        if (userRole === 'administrativo') return true
+        return meta?.canWrite ?? false
+    }
+    const canWrite = getCanWriteColumn()
 
     const onBlur = () => {
         if (!canWrite) return
@@ -243,9 +280,19 @@ const SmartDateCell = React.memo(({ getValue, row: { index, original }, column: 
     const [inputValue, setInputValue] = React.useState(formatDisplay(rawValue))
     const [isEditing, setIsEditing] = React.useState(false)
 
-    // Permission check (Dates belong to Laboratorio/Programacion)
+    // Permission check - Column-based restrictions by role
     const meta = table.options.meta as any
-    const canWrite = meta?.canWrite || meta?.permissions?.laboratorio?.write || meta?.permissions?.programacion?.write || false
+    const userRole = (meta?.userRole || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+
+    const getCanWriteColumn = (): boolean => {
+        if (userRole === 'admin') return true
+        if (userRole === 'laboratorio_lector' || userRole.includes('lector')) return false
+        if (userRole === 'laboratorio_tipificador' || (userRole.includes('laboratorio') && userRole.includes('tipificador'))) return true
+        if (userRole === 'vendor' || userRole.includes('vendedor') || userRole.includes('asesor') || userRole.includes('comercial')) return true
+        if (userRole === 'administrativo') return true
+        return meta?.canWrite ?? false
+    }
+    const canWrite = getCanWriteColumn()
 
     React.useEffect(() => {
         setInputValue(formatDisplay(rawValue))
@@ -365,9 +412,19 @@ const CodigoMuestraCell = React.memo(({ getValue, row: { index, original }, colu
     const [isEditing, setIsEditing] = React.useState(false)
     const [inputValue, setInputValue] = React.useState(value || "")
 
-    // Permission (Laboratorio)
+    // Permission check - Column-based restrictions by role
     const meta = table.options.meta as any
-    const canWrite = meta?.canWrite || meta?.permissions?.laboratorio?.write || meta?.permissions?.programacion?.write || false
+    const userRole = (meta?.userRole || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+
+    const getCanWriteColumn = (): boolean => {
+        if (userRole === 'admin') return true
+        if (userRole === 'laboratorio_lector' || userRole.includes('lector')) return false
+        if (userRole === 'laboratorio_tipificador' || (userRole.includes('laboratorio') && userRole.includes('tipificador'))) return true
+        if (userRole === 'vendor' || userRole.includes('vendedor') || userRole.includes('asesor') || userRole.includes('comercial')) return true
+        if (userRole === 'administrativo') return true
+        return meta?.canWrite ?? false
+    }
+    const canWrite = getCanWriteColumn()
 
     const onBlur = () => {
         setIsEditing(false)
@@ -425,10 +482,23 @@ const CotizacionCell = React.memo(({ getValue, row: { index, original }, column:
     const [isEditing, setIsEditing] = React.useState(false)
     const [inputValue, setInputValue] = React.useState(value || "")
 
-    // --- Granular Permissions Check ---
+    // --- Column-based permissions: tipificador and administrativo CANNOT edit cotizacion_lab ---
     const meta = table.options.meta as any
-    const canWriteGlobal = meta?.canWrite ?? false
-    const canEdit = canWriteGlobal || meta?.permissions?.comercial?.write || false
+    const userRole = (meta?.userRole || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+
+    const getCanEditCotizacion = (): boolean => {
+        if (userRole === 'admin') return true
+        // tipificador cannot edit cotizacion
+        if (userRole === 'laboratorio_tipificador' || (userRole.includes('laboratorio') && userRole.includes('tipificador'))) return false
+        // administrativo cannot edit cotizacion
+        if (userRole === 'administrativo') return false
+        // lector cannot edit anything
+        if (userRole === 'laboratorio_lector' || userRole.includes('lector')) return false
+        // vendor CAN edit cotizacion
+        if (userRole === 'vendor' || userRole.includes('vendedor') || userRole.includes('asesor') || userRole.includes('comercial')) return true
+        return meta?.canWrite ?? false
+    }
+    const canEdit = getCanEditCotizacion()
 
     const onBlur = () => {
         setIsEditing(false)
@@ -499,10 +569,23 @@ CotizacionCell.displayName = "CotizacionCell"
 const AutorizacionCell = React.memo(({ getValue, row: { index, original }, column: { id }, table }: EditableCellProps<ProgramacionServicio>) => {
     const value = getValue() as string
 
-    // --- Granular Permissions Check ---
+    // --- Column-based permissions: tipificador CANNOT edit autorizacion_lab ---
     const meta = table.options.meta as any
-    const canWriteGlobal = meta?.canWrite ?? false
-    const canEdit = canWriteGlobal || meta?.permissions?.administracion?.write || false
+    const userRole = (meta?.userRole || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+
+    const getCanEditAutorizacion = (): boolean => {
+        if (userRole === 'admin') return true
+        // tipificador cannot edit autorizacion
+        if (userRole === 'laboratorio_tipificador' || (userRole.includes('laboratorio') && userRole.includes('tipificador'))) return false
+        // lector cannot edit anything
+        if (userRole === 'laboratorio_lector' || userRole.includes('lector')) return false
+        // vendor CAN edit autorizacion
+        if (userRole === 'vendor' || userRole.includes('vendedor') || userRole.includes('asesor') || userRole.includes('comercial')) return true
+        // administrativo CAN edit autorizacion
+        if (userRole === 'administrativo') return true
+        return meta?.canWrite ?? false
+    }
+    const canEdit = getCanEditAutorizacion()
 
     const handleChange = (newValue: string) => {
         if (!canEdit) return
@@ -524,10 +607,23 @@ AutorizacionCell.displayName = "AutorizacionCell"
 const PaymentStatusCell = React.memo(({ getValue, row, column: { id }, table }: EditableCellProps<ProgramacionServicio>) => {
     const value = getValue() as string
 
-    // --- Granular Permissions Check ---
+    // --- Column-based permissions: vendor CANNOT edit estado_pago ---
     const meta = table.options.meta as any
-    const canWriteGlobal = meta?.canWrite ?? false
-    const canEdit = canWriteGlobal || meta?.permissions?.administracion?.write || false
+    const userRole = (meta?.userRole || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+
+    const getCanEditPayment = (): boolean => {
+        if (userRole === 'admin') return true
+        // vendor cannot edit estado_pago
+        if (userRole === 'vendor' || userRole.includes('vendedor') || userRole.includes('asesor') || userRole.includes('comercial')) return false
+        // lector cannot edit anything
+        if (userRole === 'laboratorio_lector' || userRole.includes('lector')) return false
+        // tipificador CAN edit estado_pago
+        if (userRole === 'laboratorio_tipificador' || (userRole.includes('laboratorio') && userRole.includes('tipificador'))) return true
+        // administrativo CAN edit estado_pago
+        if (userRole === 'administrativo') return true
+        return meta?.canWrite ?? false
+    }
+    const canEdit = getCanEditPayment()
 
     const onStatusChange = (newValue: string) => {
         if (!canEdit) return
