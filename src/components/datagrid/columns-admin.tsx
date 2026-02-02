@@ -32,8 +32,11 @@ const EditableCell = React.memo(({ getValue, row: { index, original }, column: {
 
     React.useEffect(() => { setValue(initialValue) }, [initialValue])
 
+    const canWrite = (table.options.meta as any)?.canWrite ?? false
+
     const onBlur = () => {
         setIsFocused(false)
+        if (!canWrite) return
         if (value !== initialValue) {
             table.options.meta?.updateData((original as any).id, id, value)
         }
@@ -58,6 +61,14 @@ const EditableCell = React.memo(({ getValue, row: { index, original }, column: {
 
     const isDate = id.includes('fecha') || id === 'entrega_real'
     const textSize = className?.includes('text-') ? '' : 'text-sm'
+
+    if (!canWrite) {
+        return (
+            <div className={cn("px-1 py-1 truncate cursor-not-allowed opacity-70", textSize, className)} title="Vista Solo Lectura">
+                {isDate ? (value ? new Date(value as string).toLocaleDateString() : "-") : (value as string || "-")}
+            </div>
+        )
+    }
 
     if (isDate) {
         return (
@@ -297,7 +308,9 @@ const SortableHeader = ({ column, title, className }: { column: Column<Programac
 
 const AutorizacionCell = React.memo(({ getValue, row: { index, original }, column: { id }, table }: EditableCellProps<ProgramacionServicio>) => {
     const value = getValue() as string
-    const isAdmin = true
+    const userRole = (table.options.meta as any)?.userRole?.toLowerCase() || ''
+    const canWrite = (table.options.meta as any)?.canWrite ?? false
+    const isAdmin = canWrite && (userRole.includes('admin') || userRole.includes('administracion'))
     const handleChange = (newValue: string) => { table.options.meta?.updateData((original as any).id, id, newValue) }
 
     const ADMIN_OPTIONS = [
@@ -306,7 +319,7 @@ const AutorizacionCell = React.memo(({ getValue, row: { index, original }, colum
     ]
 
     return (
-        <div className="w-full h-full flex items-center justify-center p-1">
+        <div className={cn("w-full h-full flex items-center justify-center p-1", !isAdmin && "cursor-not-allowed")}>
             <AuthorizationSelect value={value} onChange={handleChange} disabled={!isAdmin} options={ADMIN_OPTIONS} />
         </div>
     )
@@ -315,8 +328,16 @@ AutorizacionCell.displayName = "AutorizacionCell"
 
 const PaymentStatusCell = React.memo(({ getValue, row, column: { id }, table }: EditableCellProps<ProgramacionServicio>) => {
     const value = getValue() as string
-    const onStatusChange = (newValue: string) => { table.options.meta?.updateData((row.original as any).id, id, newValue) }
-    return <div className="w-full h-full flex items-center justify-center p-1"><PaymentSelect value={value} onChange={onStatusChange} /></div>
+    const canWrite = (table.options.meta as any)?.canWrite ?? false
+    const onStatusChange = (newValue: string) => {
+        if (!canWrite) return
+        table.options.meta?.updateData((row.original as any).id, id, newValue)
+    }
+    return (
+        <div className={cn("w-full h-full flex items-center justify-center p-1", !canWrite && "cursor-not-allowed")}>
+            <PaymentSelect value={value} onChange={onStatusChange} disabled={!canWrite} />
+        </div>
+    )
 })
 PaymentStatusCell.displayName = "PaymentStatusCell"
 

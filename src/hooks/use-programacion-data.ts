@@ -35,7 +35,6 @@ export function useProgramacionData() {
                 "postgres_changes",
                 { event: "*", schema: "public", table: "programacion_lab" },
                 (payload) => {
-                    console.log("Realtime (lab) event:", payload)
                     queryClient.invalidateQueries({ queryKey: ["programacion"] })
                 }
             )
@@ -43,7 +42,6 @@ export function useProgramacionData() {
                 "postgres_changes",
                 { event: "*", schema: "public", table: "programacion_comercial" },
                 (payload) => {
-                    console.log("Realtime (com) event:", payload)
                     queryClient.invalidateQueries({ queryKey: ["programacion"] })
                 }
             )
@@ -51,7 +49,6 @@ export function useProgramacionData() {
                 "postgres_changes",
                 { event: "*", schema: "public", table: "programacion_administracion" },
                 (payload) => {
-                    console.log("Realtime (admin) event:", payload)
                     queryClient.invalidateQueries({ queryKey: ["programacion"] })
                 }
             )

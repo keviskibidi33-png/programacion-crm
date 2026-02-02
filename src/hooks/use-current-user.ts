@@ -15,12 +15,10 @@ export function useCurrentUser() {
     const [role, setRole] = useState<string | null>(null)
     const [loading, setLoading] = useState(true)
     const [allowedViews, setAllowedViews] = useState<ViewMode[]>([])
+    const [canWrite, setCanWrite] = useState(false)
 
     useEffect(() => {
         async function fetchRole() {
-            // DEV MODE: TOTAL BYPASS
-            setAllowedViews(['LAB', 'COM', 'ADMIN'])
-
             if (!userIdParam) {
                 setLoading(false)
                 return
@@ -34,16 +32,32 @@ export function useCurrentUser() {
                     .single()
 
                 if (error || !data) {
-                    // console.error("Error fetching user role", error)
                     setRole(null)
-                    setLoading(false) // Ensure loading stops
+                    setLoading(false)
                     return
                 }
 
-                setRole(data.role)
+                const userRole = data.role.toLowerCase()
+                setRole(userRole)
+
+                // canWrite is true if the role doesn't contain "lectura" 
+                // and it's not a generic guest role if that existed.
+                setCanWrite(!userRole.includes("lectura"))
+
+                // Determine allowed views based on role
+                const views: ViewMode[] = ["LAB"] // Everyone gets Lab
+
+                if (userRole.includes("admin") || userRole.includes("comercial")) {
+                    views.push("COM")
+                }
+
+                if (userRole.includes("admin") || userRole.includes("administracion")) {
+                    views.push("ADMIN")
+                }
+
+                setAllowedViews([...new Set(views)])
                 setLoading(false)
             } catch (e) {
-                // console.error("Exception fetching role", e)
                 setLoading(false)
             }
         }
@@ -56,6 +70,7 @@ export function useCurrentUser() {
         role,
         loading,
         allowedViews,
+        canWrite,
         canView: (mode: ViewMode) => allowedViews.includes(mode)
     }
 }

@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils"
 interface StatusSelectProps {
     value: string
     onChange: (value: string) => void
+    disabled?: boolean
 }
 
 const STATUS_OPTIONS = [
@@ -25,7 +26,7 @@ const getStatusColor = (status: string) => {
     return "bg-white text-zinc-700 border-zinc-200"
 }
 
-export function StatusSelect({ value, onChange }: StatusSelectProps) {
+export function StatusSelect({ value, onChange, disabled }: StatusSelectProps) {
     const [isOpen, setIsOpen] = useState(false)
     const containerRef = useRef<HTMLDivElement>(null)
 
@@ -45,7 +46,7 @@ export function StatusSelect({ value, onChange }: StatusSelectProps) {
                 setIsOpen(false)
             }
         }
-        if (isOpen) {
+        if (isOpen && !disabled) {
             document.addEventListener("mousedown", handleClickOutside)
             // Calculate position
             if (containerRef.current) {
@@ -60,9 +61,10 @@ export function StatusSelect({ value, onChange }: StatusSelectProps) {
         return () => {
             document.removeEventListener("mousedown", handleClickOutside)
         }
-    }, [isOpen])
+    }, [isOpen, disabled])
 
     const handleSelect = (newValue: string) => {
+        if (disabled) return
         onChange(newValue)
         setIsOpen(false)
     }
@@ -71,11 +73,12 @@ export function StatusSelect({ value, onChange }: StatusSelectProps) {
         <div className="relative w-full h-full flex items-center justify-center" ref={containerRef}>
             {/* Trigger Badge */}
             <div
-                onClick={() => setIsOpen(!isOpen)}
+                onClick={() => !disabled && setIsOpen(!isOpen)}
                 className={cn(
-                    "px-2 py-0.5 rounded border text-[11px] font-semibold text-center cursor-pointer select-none truncate w-full transition-all flex items-center justify-center h-[22px]",
+                    "px-2 py-0.5 rounded border text-[11px] font-semibold text-center select-none truncate w-full transition-all flex items-center justify-center h-[22px]",
                     getStatusColor(value),
-                    isOpen && "ring-2 ring-blue-400 ring-offset-1"
+                    isOpen && "ring-2 ring-blue-400 ring-offset-1",
+                    disabled ? "cursor-not-allowed opacity-70" : "cursor-pointer"
                 )}
             >
                 {value || "PENDIENTE"}

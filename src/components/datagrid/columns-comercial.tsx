@@ -26,8 +26,11 @@ const EditableCell = React.memo(({ getValue, row, column: { id }, table, classNa
 
     React.useEffect(() => { setValue(initialValue) }, [initialValue])
 
+    const canWrite = (table.options.meta as any)?.canWrite ?? false
+
     const onBlur = () => {
         setIsFocused(false)
+        if (!canWrite) return
         if (value !== initialValue) {
             table.options.meta?.updateData((original as any).id, id, value)
         }
@@ -55,6 +58,14 @@ const EditableCell = React.memo(({ getValue, row, column: { id }, table, classNa
     const textSize = className?.includes('text-') ? '' : 'text-sm'
 
     // For Comercial view, we might prefer SmartDateCell, but if basic date is needed fallback here.
+    if (!canWrite) {
+        return (
+            <div className={cn("px-1 py-1 truncate cursor-not-allowed opacity-70", textSize, className)} title="Vista Solo Lectura">
+                {isDate ? (value ? new Date(value as string).toLocaleDateString() : "-") : (value as string || "-")}
+            </div>
+        )
+    }
+
     if (isDate) {
         return (
             <input
@@ -221,6 +232,12 @@ const OTCell = React.memo(({ getValue, row, column: { id }, table }: EditableCel
             }, 0)
         }
     }
+    const canWrite = (table.options.meta as any)?.canWrite ?? false
+
+    if (!canWrite) {
+        return <div className="px-1 py-1 truncate cursor-not-allowed opacity-70 text-zinc-500 h-full flex items-center">{value || "-"}</div>
+    }
+
     return <input value={value} onChange={e => setValue(e.target.value)} onBlur={onBlur} onKeyDown={onKeyDown} className="w-full bg-white border-none focus:outline-none focus:ring-1 focus:ring-blue-500 rounded px-2 -mx-1 h-full text-zinc-900 font-medium" placeholder="OT #" />
 })
 OTCell.displayName = "OTCell"
@@ -233,8 +250,8 @@ const CotizacionCell = React.memo(({ getValue, row, column: { id }, table }: Edi
 
     // Permission check: only Admin, Comercial or Administracion can edit
     const userRole = (table.options.meta as any)?.userRole?.toLowerCase() || ''
-    // const canEdit = userRole === 'admin' || userRole.includes('comercial') || userRole.includes('administracion')
-    const canEdit = true // DEV MODE: UNRESTRICTED
+    const canWrite = (table.options.meta as any)?.canWrite ?? false
+    const canEdit = canWrite && (userRole.includes('admin') || userRole.includes('comercial') || userRole.includes('administracion'))
 
     const onBlur = () => {
         setIsEditing(false)
@@ -354,8 +371,8 @@ const AutorizacionCell = React.memo(({ getValue, row, column: { id }, table }: E
 
     // Permission check: Laboratorio CANNOT edit authorization
     const userRole = (table.options.meta as any)?.userRole?.toLowerCase() || ''
-    // const canEdit = userRole === 'admin' || userRole.includes('administracion') || userRole.includes('comercial')
-    const canEdit = true // DEV MODE: UNRESTRICTED
+    const canWrite = (table.options.meta as any)?.canWrite ?? false
+    const canEdit = canWrite && (userRole.includes('admin') || userRole.includes('administracion') || userRole.includes('comercial'))
 
     const handleChange = (newValue: string) => {
         if (!canEdit) return

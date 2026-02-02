@@ -5,14 +5,14 @@ import { useSearchParams } from "next/navigation"
 import { DataTable } from "@/components/datagrid/data-table"
 import { columns } from "@/components/datagrid/columns"
 import { useProgramacionData } from "@/hooks/use-programacion-data"
-import { RefreshCw, Save, Wifi, WifiOff, FileDown } from "lucide-react"
+import { RefreshCw, Save, Wifi, WifiOff, FileDown, Info } from "lucide-react"
 import { LoginButton } from "@/components/login-button"
 import { useCurrentUser } from "@/hooks/use-current-user"
 
 export function DatagridEditor() {
     const searchParams = useSearchParams()
     const modeParam = searchParams.get('mode')
-    const { loading: authLoading, role, allowedViews, canView } = useCurrentUser()
+    const { loading: authLoading, role, allowedViews, canView, canWrite } = useCurrentUser()
 
     // Initialize state based on URL param
     const [viewMode, setViewMode] = React.useState<"LAB" | "COM" | "ADMIN">(() => {
@@ -94,7 +94,10 @@ export function DatagridEditor() {
                                     </button>
                                 )}
                                 {allowedViews.length === 0 && !authLoading && (
-                                    <span className="px-3 py-1 text-xs font-medium text-red-500">Sin acceso</span>
+                                    <span className="px-2.5 py-1 text-[10px] uppercase font-bold text-zinc-500 bg-zinc-50 border border-zinc-200 rounded-md flex items-center gap-1.5 cursor-default">
+                                        <Info className="w-3 h-3 text-zinc-400" />
+                                        Modo Consulta
+                                    </span>
                                 )}
                             </div>
                         </div>
@@ -134,8 +137,9 @@ export function DatagridEditor() {
                             data={data}
                             loading={isLoading}
                             onUpdate={updateField}
-                            onInsert={insertRow}
+                            onInsert={canWrite ? insertRow : undefined}
                             userRole={role || ''}
+                            canWrite={canWrite}
                             key={viewMode} // Force remount on view change to reset table state (pinning, etc)
                         />
                     </div>

@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils"
 interface PaymentSelectProps {
     value: string
     onChange: (value: string) => void
+    disabled?: boolean
 }
 
 const PAYMENT_OPTIONS = [
@@ -23,7 +24,7 @@ const getStatusColor = (status: string) => {
     return "bg-white text-zinc-700 border-zinc-200"
 }
 
-export function PaymentSelect({ value, onChange }: PaymentSelectProps) {
+export function PaymentSelect({ value, onChange, disabled }: PaymentSelectProps) {
     const [isOpen, setIsOpen] = useState(false)
     const containerRef = useRef<HTMLDivElement>(null)
     const [position, setPosition] = React.useState({ top: 0, left: 0, width: 0 })
@@ -39,7 +40,7 @@ export function PaymentSelect({ value, onChange }: PaymentSelectProps) {
                 setIsOpen(false)
             }
         }
-        if (isOpen) {
+        if (isOpen && !disabled) {
             document.addEventListener("mousedown", handleClickOutside)
             if (containerRef.current) {
                 const rect = containerRef.current.getBoundingClientRect()
@@ -53,21 +54,23 @@ export function PaymentSelect({ value, onChange }: PaymentSelectProps) {
         return () => {
             document.removeEventListener("mousedown", handleClickOutside)
         }
-    }, [isOpen])
+    }, [isOpen, disabled])
 
     const handleSelect = (newValue: string) => {
+        if (disabled) return
         onChange(newValue)
         setIsOpen(false)
     }
 
     return (
-        <div className="relative w-full h-full flex items-center justify-center" ref={containerRef}>
+        <div className="relative w-full h-full flex items-center justify-center font-bold" ref={containerRef}>
             <div
-                onClick={() => setIsOpen(!isOpen)}
+                onClick={() => !disabled && setIsOpen(!isOpen)}
                 className={cn(
-                    "px-2 py-0.5 rounded border text-[10px] font-bold text-center cursor-pointer select-none truncate w-full transition-all flex items-center justify-center h-[22px]",
+                    "px-2 py-0.5 rounded border text-[10px] font-bold text-center select-none truncate w-full transition-all flex items-center justify-center h-[22px]",
                     getStatusColor(value),
-                    isOpen && "ring-2 ring-blue-400 ring-offset-1"
+                    isOpen && "ring-2 ring-blue-400 ring-offset-1",
+                    disabled ? "cursor-not-allowed opacity-70" : "cursor-pointer"
                 )}
             >
                 {value || "PENDIENTE"}
