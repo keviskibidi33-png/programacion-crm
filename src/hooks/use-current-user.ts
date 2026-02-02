@@ -77,19 +77,23 @@ export function useCurrentUser() {
                     ? (data as any).role_definitions[0]
                     : (data as any).role_definitions
 
-                const perms = roleDef?.permissions || {}
-                setPermissions(perms)
+                const perms = roleDef?.permissions
+                if (perms && Object.keys(perms).length > 0) {
+                    setPermissions(perms)
 
-                const views: ViewMode[] = []
-                if (perms.laboratorio?.read) views.push("LAB")
-                if (perms.comercial?.read) views.push("COM")
-                if (perms.administracion?.read) views.push("ADMIN")
+                    const views: ViewMode[] = []
+                    if (perms.laboratorio?.read) views.push("LAB")
+                    if (perms.comercial?.read) views.push("COM")
+                    if (perms.administracion?.read) views.push("ADMIN")
 
-                if (userRole.includes("admin") || userRole.includes("gerencia") || userRole.includes("administra")) {
-                    setAllowedViews(["LAB", "COM", "ADMIN"])
+                    if (userRole.includes("admin") || userRole.includes("gerencia") || userRole.includes("administra")) {
+                        setAllowedViews(["LAB", "COM", "ADMIN"])
+                    } else {
+                        if (views.length === 0) views.push("LAB")
+                        setAllowedViews([...new Set(views)])
+                    }
                 } else {
-                    if (views.length === 0) views.push("LAB")
-                    setAllowedViews([...new Set(views)])
+                    console.log("[Auth] role_definitions vacíos o bloqueados por RLS, manteniendo fallbacks")
                 }
 
                 setLoading(false)
