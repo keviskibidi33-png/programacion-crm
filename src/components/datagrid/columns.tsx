@@ -577,6 +577,9 @@ const StatusCell = React.memo(({ getValue, row: { original }, column: { id }, ta
     const userRole = (meta?.userRole || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
 
     const getCanEditStatus = (): boolean => {
+        // DEBUG: temporary log to diagnose permission issues
+        console.log('[StatusCell] userRole:', userRole, '| canWrite from meta:', meta?.canWrite)
+
         if (userRole === 'admin') return true
         // lector cannot edit anything
         if (userRole === 'laboratorio_lector' || userRole.includes('lector')) return false
@@ -589,6 +592,9 @@ const StatusCell = React.memo(({ getValue, row: { original }, column: { id }, ta
         return meta?.canWrite ?? false
     }
     const canEdit = getCanEditStatus()
+
+    // DEBUG: log the final canEdit value
+    console.log('[StatusCell] Final canEdit:', canEdit)
 
     const handleChange = (newValue: string) => {
         if (!canEdit) return
