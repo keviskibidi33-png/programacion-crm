@@ -12,7 +12,7 @@ import { useCurrentUser } from "@/hooks/use-current-user"
 export function DatagridEditor() {
     const searchParams = useSearchParams()
     const modeParam = searchParams.get('mode')
-    const { loading: authLoading, role, allowedViews, canView, canWrite } = useCurrentUser()
+    const { loading: authLoading, role, allowedViews, canView, getCanWrite } = useCurrentUser()
 
     // Initialize state based on URL param
     const [viewMode, setViewMode] = React.useState<"LAB" | "COM" | "ADMIN">(() => {
@@ -20,6 +20,8 @@ export function DatagridEditor() {
         if (modeParam === 'admin') return 'ADMIN'
         return 'LAB'
     })
+
+    const canWrite = React.useMemo(() => getCanWrite(viewMode), [viewMode, getCanWrite])
 
     // Enforce Permissions Logic
     React.useEffect(() => {

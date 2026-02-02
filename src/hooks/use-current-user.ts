@@ -15,7 +15,7 @@ export function useCurrentUser() {
     const [role, setRole] = useState<string | null>(null)
     const [loading, setLoading] = useState(true)
     const [allowedViews, setAllowedViews] = useState<ViewMode[]>([])
-    const [canWrite, setCanWrite] = useState(false)
+    const [permissions, setPermissions] = useState<any>(null)
 
     useEffect(() => {
         async function fetchRole() {
@@ -27,7 +27,7 @@ export function useCurrentUser() {
             try {
                 const { data, error } = await supabase
                     .from("perfiles")
-                    .select("role")
+                    .select("role, role_definitions!fk_perfiles_role(permissions)")
                     .eq("id", userIdParam)
                     .single()
 
@@ -40,19 +40,23 @@ export function useCurrentUser() {
                 const userRole = data.role.toLowerCase()
                 setRole(userRole)
 
-                // canWrite is true if the role doesn't contain "lectura" 
-                // and it's not a generic guest role if that existed.
-                setCanWrite(!userRole.includes("lectura"))
+                // Extract permissions from the join
+                const perms = (data as any).role_definitions?.permissions || {}
+                setPermissions(perms)
 
-                // Determine allowed views based on role
-                const views: ViewMode[] = ["LAB"] // Everyone gets Lab
+                // Determine allowed views and granular write access
+                const views: ViewMode[] = []
 
-                if (userRole.includes("admin") || userRole.includes("comercial")) {
-                    views.push("COM")
-                }
+                if (perms.laboratorio?.read) views.push("LAB")
+                if (perms.comercial?.read) views.push("COM")
+                if (perms.administracion?.read) views.push("ADMIN")
 
-                if (userRole.includes("admin") || userRole.includes("administracion")) {
-                    views.push("ADMIN")
+                // Fallback for transition or admin
+                if (userRole.includes("admin") && views.length === 0) {
+                    views.push("LAB", "COM", "ADMIN")
+                } else if (views.length === 0) {
+                    // Default fallback if no permissions defined yet
+                    views.push("LAB")
                 }
 
                 setAllowedViews([...new Set(views)])
@@ -70,7 +74,14 @@ export function useCurrentUser() {
         role,
         loading,
         allowedViews,
-        canWrite,
-        canView: (mode: ViewMode) => allowedViews.includes(mode)
+        permissions,
+        canView: (mode: ViewMode) => allowedViews.includes(mode),
+        getCanWrite: (mode: ViewMode) => {
+            if (role?.includes("admin")) return true
+            if (mode === "LAB") return permissions?.laboratorio?.write || false
+            if (mode === "COM") return permissions?.comercial?.write || false
+            if (mode === "ADMIN") return permissions?.administracion?.write || false
+            return false
+        }
     }
 }

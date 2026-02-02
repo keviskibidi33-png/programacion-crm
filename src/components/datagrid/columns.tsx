@@ -7,6 +7,7 @@ import { ArrowUpDown } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { StatusSelect } from "./status-select"
 import { AuthorizationSelect } from "./authorization-select"
+import { PaymentSelect } from "./payment-select"
 
 // Extend meta to support custom cell editing
 declare module "@tanstack/react-table" {
@@ -548,6 +549,25 @@ const AutorizacionCell = React.memo(({ getValue, row: { index, original }, colum
 })
 AutorizacionCell.displayName = "AutorizacionCell"
 
+const PaymentStatusCell = React.memo(({ getValue, row, column: { id }, table }: EditableCellProps<ProgramacionServicio>) => {
+    const value = getValue() as string
+    const userRole = (table.options.meta as any)?.userRole?.toLowerCase() || ''
+    const canWrite = (table.options.meta as any)?.canWrite ?? false
+    // Only Admin or Administracion can edit payment
+    const canEdit = canWrite && (userRole.includes('admin') || userRole.includes('administracion'))
+
+    const onStatusChange = (newValue: string) => {
+        if (!canEdit) return
+        table.options.meta?.updateData((row.original as any).id, id, newValue)
+    }
+    return (
+        <div className={cn("w-full h-full flex items-center justify-center p-1", !canEdit && "cursor-not-allowed")}>
+            <PaymentSelect value={value} onChange={onStatusChange} disabled={!canEdit} />
+        </div>
+    )
+})
+PaymentStatusCell.displayName = "PaymentStatusCell"
+
 export const columns: ColumnDef<ProgramacionServicio>[] = [
     {
         accessorKey: "item_numero",
@@ -698,6 +718,12 @@ export const columns: ColumnDef<ProgramacionServicio>[] = [
         maxSize: 200,
         enableResizing: true,
         cell: AutorizacionCell,
+    },
+    {
+        accessorKey: "estado_pago",
+        header: ({ column }) => <SortableHeader column={column} title={`ESTADO\nPAGO`} className="text-emerald-700" />,
+        size: 130, minSize: 100, maxSize: 200, enableResizing: true,
+        cell: PaymentStatusCell,
     },
     {
         accessorKey: "nota_admin",
