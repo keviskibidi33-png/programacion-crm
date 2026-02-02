@@ -83,7 +83,9 @@ export function useCurrentUser() {
         canView: (mode: ViewMode) => allowedViews.includes(mode),
         getCanWrite: (mode: ViewMode) => {
             if (role?.includes("admin")) return true
-            if (mode === "LAB") return permissions?.laboratorio?.write || false
+            if (mode === "LAB") {
+                return permissions?.laboratorio?.write || permissions?.programacion?.write || false
+            }
             if (mode === "COM") return permissions?.comercial?.write || false
             if (mode === "ADMIN") return permissions?.administracion?.write || false
             return false
