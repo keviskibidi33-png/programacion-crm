@@ -31,9 +31,12 @@ const formatDateToShort = (dateStr: string | null) => {
     }
 }
 
-interface EditableCellProps<TData> {
+// Export components for use in other column definitions
+export { EditableCell, OTCell, SmartDateCell, CotizacionCell, AutorizacionCell, PaymentStatusCell }
+
+export type EditableCellProps<TData> = {
     getValue: () => unknown
-    row: { index: number; original: TData }
+    row: { index: number, original: TData }
     column: { id: string }
     table: Table<TData>
     className?: string
@@ -45,8 +48,29 @@ const EditableCell = React.memo(({ getValue, row: { index, original }, column: {
     const [value, setValue] = React.useState(initialValue)
     const [isFocused, setIsFocused] = React.useState(false)
 
-    // Permission check
-    const canWrite = table.options.meta?.canWrite ?? false
+    // --- Granular Permissions Layer ("The Security Guard") ---
+    const meta = table.options.meta as any
+    const permissions = meta?.permissions
+    const userRole = meta?.userRole?.toLowerCase() || ""
+    const isAdmin = userRole.includes("admin") || userRole.includes("gerencia")
+
+    // Determine the area of this column to check the specific permission
+    const commercialFields = ["cotizacion_lab"]
+    const adminFields = ["autorizacion_lab", "estado_pago", "nota_admin"]
+
+    let canWrite = meta?.canWrite ?? false // Global override (from URL/Admin)
+
+    // If not already forced by Admin/URL, check the specific module in the matrix
+    if (!canWrite && permissions) {
+        if (commercialFields.includes(id)) {
+            canWrite = permissions.comercial?.write || false
+        } else if (adminFields.includes(id)) {
+            canWrite = permissions.administracion?.write || false
+        } else {
+            // Default to Laboratorio/Programacion area
+            canWrite = permissions.laboratorio?.write || permissions.programacion?.write || false
+        }
+    }
 
     // Sync external changes
     React.useEffect(() => {
@@ -88,7 +112,7 @@ const EditableCell = React.memo(({ getValue, row: { index, original }, column: {
 
     if (!canWrite) {
         return (
-            <div className={cn("px-1 py-1 truncate cursor-not-allowed opacity-70", colorClass, textSize, className)} title="Vista Solo Lectura">
+            <div className={cn("px-1 py-1 truncate cursor-not-allowed opacity-70 bg-zinc-50/30", colorClass, textSize, className)} title="Sin permiso de edición">
                 {isDate ? formatDateToShort(value as string) : (value as string || "-")}
             </div>
         )
@@ -140,34 +164,28 @@ EditableCell.displayName = "EditableCell"
 // OT Cell (Auto-adds -26 when user enters just digits)
 const OTCell = React.memo(({ getValue, row: { index, original }, column: { id }, table }: EditableCellProps<ProgramacionServicio>) => {
     const rawValue = getValue() as string
-    // Strip "LEM" (case insensitive) and "-26" for display/edit
     const cleanValue = (val: string) => val ? val.replace(/LEM/i, '').replace(/-26$/, '').trim() : ""
-
     const [value, setValue] = React.useState(cleanValue(rawValue))
 
-    // Sync if external data changes
     React.useEffect(() => {
         setValue(cleanValue(rawValue))
     }, [rawValue])
 
-    const canWrite = table.options.meta?.canWrite ?? false
+    // Permission check (OT belongs to Laboratorio)
+    const meta = table.options.meta as any
+    const canWrite = meta?.canWrite || meta?.permissions?.laboratorio?.write || meta?.permissions?.programacion?.write || false
 
     const onBlur = () => {
         if (!canWrite) return
         let finalValue = value.trim()
-
-        // Auto-add -26 if user enters just digits
         if (finalValue && /^\d+$/.test(finalValue)) {
             finalValue = `${finalValue}-26`
         } else if (finalValue && !finalValue.includes('-26')) {
-            // If they entered something like "558-" or "558", ensure -26 is added
-            finalValue = finalValue.replace(/-$/, '') // remove trailing dash if any
+            finalValue = finalValue.replace(/-$/, '')
             if (/^\d+$/.test(finalValue)) {
                 finalValue = `${finalValue}-26`
             }
         }
-
-        // Only update if changed
         if (finalValue !== rawValue) {
             table.options.meta?.updateData(original.id, id, finalValue)
         }
@@ -179,8 +197,7 @@ const OTCell = React.memo(({ getValue, row: { index, original }, column: { id },
             e.currentTarget.blur()
             setTimeout(() => {
                 const allInputs = Array.from(document.querySelectorAll('input:not([type="hidden"]), textarea, select')) as HTMLElement[];
-                const currentElement = e.target as HTMLElement;
-                const currentIndex = allInputs.indexOf(currentElement);
+                const currentIndex = allInputs.indexOf(e.target as HTMLElement);
                 if (currentIndex !== -1 && currentIndex < allInputs.length - 1) {
                     allInputs[currentIndex + 1].focus();
                     if (allInputs[currentIndex + 1] instanceof HTMLInputElement) {
@@ -211,13 +228,12 @@ OTCell.displayName = "OTCell"
 // Smart Date Cell (DD/MM -> YYYY-MM-DD)
 const SmartDateCell = React.memo(({ getValue, row: { index, original }, column: { id }, table }: EditableCellProps<ProgramacionServicio>) => {
     const rawValue = getValue() as string
-    // Format for display: YYYY-MM-DD -> DD/MM/YY
     const formatDisplay = (val: string) => {
         if (!val) return ""
         try {
             const date = new Date(val)
             if (isNaN(date.getTime())) return val
-            const d = String(date.getUTCDate()).padStart(2, '0') // Use UTC to avoid timezone shifts on simple dates
+            const d = String(date.getUTCDate()).padStart(2, '0')
             const m = String(date.getUTCMonth() + 1).padStart(2, '0')
             const y = String(date.getUTCFullYear()).slice(-2)
             return `${d}/${m}/${y}`
@@ -227,7 +243,9 @@ const SmartDateCell = React.memo(({ getValue, row: { index, original }, column: 
     const [inputValue, setInputValue] = React.useState(formatDisplay(rawValue))
     const [isEditing, setIsEditing] = React.useState(false)
 
-    const canWrite = table.options.meta?.canWrite ?? false
+    // Permission check (Dates belong to Laboratorio/Programacion)
+    const meta = table.options.meta as any
+    const canWrite = meta?.canWrite || meta?.permissions?.laboratorio?.write || meta?.permissions?.programacion?.write || false
 
     React.useEffect(() => {
         setInputValue(formatDisplay(rawValue))
@@ -240,78 +258,51 @@ const SmartDateCell = React.memo(({ getValue, row: { index, original }, column: 
         }
         setIsEditing(false)
         let finalVal = inputValue.trim()
-
-        // Smart Parsing Logic
         let valToParse = finalVal
-        if (/^\d{3}$/.test(valToParse)) {
-            valToParse = "0" + valToParse
-        }
-        const shortDateRegex = /^(\d{1,2})[./-](\d{1,2})$/
+        if (/^\d{3}$/.test(valToParse)) valToParse = "0" + valToParse
+        const shortDateRegex = /^(\d{1,2})[./探](\d{1,2})$/
         const numericMatch = valToParse.match(/^(\d{2})(\d{2})(\d{2}|\d{4})?$/)
         const match = valToParse.match(shortDateRegex)
-
         let isoDate = null
-
         if (numericMatch) {
-            const day = numericMatch[1]
-            const month = numericMatch[2]
+            const day = numericMatch[1]; const month = numericMatch[2]
             let year = numericMatch[3] || "2026"
             if (year.length === 2) year = "20" + year
             isoDate = `${year}-${month}-${day}`
-            const testDate = new Date(isoDate)
-            if (isNaN(testDate.getTime())) isoDate = null
         } else if (match) {
-            const day = match[1].padStart(2, '0')
-            const month = match[2].padStart(2, '0')
-            const year = "2026"
-            isoDate = `${year}-${month}-${day}`
-            const testDate = new Date(isoDate)
-            if (isNaN(testDate.getTime())) isoDate = null
+            const day = match[1].padStart(2, '0'); const month = match[2].padStart(2, '0')
+            isoDate = `2026-${month}-${day}`
         } else {
-            const fullDateRegex = /^(\d{1,2})[./-](\d{1,2})[./-](\d{4}|\d{2})$/
+            const fullDateRegex = /^(\d{1,2})[./探](\d{1,2})[./探](\d{4}|\d{2})$/
             const fullMatch = finalVal.match(fullDateRegex)
             if (fullMatch) {
-                const d = fullMatch[1].padStart(2, '0')
-                const m = fullMatch[2].padStart(2, '0')
-                let y = fullMatch[3]
-                if (y.length === 2) y = "20" + y
+                const d = fullMatch[1].padStart(2, '0'); const m = fullMatch[2].padStart(2, '0')
+                let y = fullMatch[3]; if (y.length === 2) y = "20" + y
                 isoDate = `${y}-${m}-${d}`
             }
         }
-
-        if (isoDate) {
+        if (isoDate && !isNaN(new Date(isoDate).getTime())) {
             table.options.meta?.updateData(original.id, id, isoDate)
-            setInputValue(formatDisplay(isoDate)) // Update display immediately
+            setInputValue(formatDisplay(isoDate))
         } else {
-            // Revert if invalid or unchanged
-            if (inputValue === "") {
-                table.options.meta?.updateData(original.id, id, null)
-            } else {
-                setInputValue(formatDisplay(rawValue))
-            }
+            if (inputValue === "") table.options.meta?.updateData(original.id, id, null)
+            else setInputValue(formatDisplay(rawValue))
         }
     }
 
-    // Check key down (navigation)
     const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
         if (e.key === 'Enter') {
-            e.preventDefault()
-            e.currentTarget.blur()
+            e.preventDefault(); e.currentTarget.blur()
             setTimeout(() => {
                 const allInputs = Array.from(document.querySelectorAll('input:not([type="hidden"]), textarea, select')) as HTMLElement[];
-                const currentElement = e.target as HTMLElement;
-                const currentIndex = allInputs.indexOf(currentElement);
+                const currentIndex = allInputs.indexOf(e.target as HTMLElement);
                 if (currentIndex !== -1 && currentIndex < allInputs.length - 1) {
                     allInputs[currentIndex + 1].focus();
-                    // Select all text
-                    if (allInputs[currentIndex + 1] instanceof HTMLInputElement) {
-                        (allInputs[currentIndex + 1] as HTMLInputElement).select();
-                    }
+                    if (allInputs[currentIndex + 1] instanceof HTMLInputElement) (allInputs[currentIndex + 1] as HTMLInputElement).select();
                 }
             }, 0)
         }
     }
-
 
     if (isEditing) {
         return (
@@ -335,7 +326,7 @@ const SmartDateCell = React.memo(({ getValue, row: { index, original }, column: 
                 "w-full h-full flex items-center px-1 text-zinc-900 font-medium leading-tight",
                 canWrite ? "cursor-pointer hover:bg-zinc-100/50" : "cursor-not-allowed text-zinc-400 opacity-70"
             )}
-            title={canWrite ? "Click para editar" : "Vista Solo Lectura"}
+            title={canWrite ? "Click para editar" : "Sin permiso de edición"}
         >
             {inputValue || <span className="text-zinc-300">--/--</span>}
         </div>
@@ -374,6 +365,10 @@ const CodigoMuestraCell = React.memo(({ getValue, row: { index, original }, colu
     const [isEditing, setIsEditing] = React.useState(false)
     const [inputValue, setInputValue] = React.useState(value || "")
 
+    // Permission (Laboratorio)
+    const meta = table.options.meta as any
+    const canWrite = meta?.canWrite || meta?.permissions?.laboratorio?.write || meta?.permissions?.programacion?.write || false
+
     const onBlur = () => {
         setIsEditing(false)
         if (inputValue !== value) {
@@ -386,13 +381,10 @@ const CodigoMuestraCell = React.memo(({ getValue, row: { index, original }, colu
             e.preventDefault(); e.currentTarget.blur()
             setTimeout(() => {
                 const allInputs = Array.from(document.querySelectorAll('input:not([type="hidden"]), textarea, select')) as HTMLElement[];
-                const currentElement = e.target as HTMLElement;
-                const currentIndex = allInputs.indexOf(currentElement);
+                const currentIndex = allInputs.indexOf(e.target as HTMLElement);
                 if (currentIndex !== -1 && currentIndex < allInputs.length - 1) {
                     allInputs[currentIndex + 1].focus();
-                    if (allInputs[currentIndex + 1] instanceof HTMLInputElement) {
-                        (allInputs[currentIndex + 1] as HTMLInputElement).select();
-                    }
+                    if (allInputs[currentIndex + 1] instanceof HTMLInputElement) (allInputs[currentIndex + 1] as HTMLInputElement).select();
                 }
             }, 0)
         }
@@ -404,8 +396,8 @@ const CodigoMuestraCell = React.memo(({ getValue, row: { index, original }, colu
 
     return (
         <div
-            onClick={() => { setInputValue(value || ""); setIsEditing(true); }}
-            className="w-full h-full cursor-pointer hover:bg-slate-50 flex items-center px-1 text-sm text-zinc-900 font-medium leading-tight break-words"
+            onClick={() => { if (canWrite) { setInputValue(value || ""); setIsEditing(true); } }}
+            className={cn("w-full h-full flex items-center px-1 text-sm text-zinc-900 font-medium leading-tight break-words", canWrite ? "cursor-pointer hover:bg-slate-50" : "cursor-not-allowed opacity-70")}
             title={value || "Click para editar"}
         >
             <span className="line-clamp-3">{value || <span className="text-zinc-300 italic">...</span>}</span>
@@ -427,30 +419,22 @@ const SortableHeader = ({ column, title, className }: { column: Column<Programac
 }
 
 // Cotizacion Cell (Auto-formats number to COTIZ.N-XXX-26)
-// LOCKED for Laboratorio view - only Comercial/Admin can edit
+// Granular: Depends on permissions.comercial.write
 const CotizacionCell = React.memo(({ getValue, row: { index, original }, column: { id }, table }: EditableCellProps<ProgramacionServicio>) => {
     const value = getValue() as string
     const [isEditing, setIsEditing] = React.useState(false)
     const [inputValue, setInputValue] = React.useState(value || "")
 
-    // Permission check: Laboratorio cannot edit COTIZACION
-    const userRole = (table.options.meta as any)?.userRole?.toLowerCase() || ''
-    const canWrite = (table.options.meta as any)?.canWrite ?? false
-
-    // Cotizacion is editable by Admin, Comercial or Administracion
-    const canEdit = canWrite && (
-        userRole.includes('admin') ||
-        userRole.includes('comercial') ||
-        userRole.includes('administracion')
-    )
+    // --- Granular Permissions Check ---
+    const meta = table.options.meta as any
+    const canWriteGlobal = meta?.canWrite ?? false
+    const canEdit = canWriteGlobal || meta?.permissions?.comercial?.write || false
 
     const onBlur = () => {
         setIsEditing(false)
         if (!canEdit) return
 
         let finalValue = inputValue.trim()
-
-        // Auto-complete logic: number -> COTIZ.N-XXX-26
         if (finalValue && /^\d+$/.test(finalValue)) {
             finalValue = `COTIZ.N-${finalValue}-26`
         } else if (finalValue.startsWith("COTIZACION-")) {
@@ -464,23 +448,18 @@ const CotizacionCell = React.memo(({ getValue, row: { index, original }, column:
 
     const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
         if (e.key === 'Enter') {
-            e.preventDefault()
-            e.currentTarget.blur()
+            e.preventDefault(); e.currentTarget.blur()
             setTimeout(() => {
                 const allInputs = Array.from(document.querySelectorAll('input:not([type="hidden"]), textarea, select')) as HTMLElement[];
-                const currentElement = e.target as HTMLElement;
-                const currentIndex = allInputs.indexOf(currentElement);
+                const currentIndex = allInputs.indexOf(e.target as HTMLElement);
                 if (currentIndex !== -1 && currentIndex < allInputs.length - 1) {
                     allInputs[currentIndex + 1].focus();
-                    if (allInputs[currentIndex + 1] instanceof HTMLInputElement) {
-                        (allInputs[currentIndex + 1] as HTMLInputElement).select();
-                    }
+                    if (allInputs[currentIndex + 1] instanceof HTMLInputElement) (allInputs[currentIndex + 1] as HTMLInputElement).select();
                 }
             }, 0)
         }
     }
 
-    // Read-only display for Laboratorio
     if (!canEdit) {
         return (
             <div className="w-full h-full flex items-center px-1 text-sm text-zinc-500 bg-zinc-50/50 cursor-not-allowed opacity-70" title="Solo Comercial puede editar">
@@ -505,12 +484,9 @@ const CotizacionCell = React.memo(({ getValue, row: { index, original }, column:
 
     return (
         <div
-            onClick={() => {
-                setInputValue(value || "")
-                setIsEditing(true)
-            }}
-            className="w-full h-full cursor-pointer hover:bg-slate-50 flex items-center px-1 text-sm truncate text-zinc-900"
-            title={value || "Click para editar"}
+            onClick={() => { setInputValue(value || ""); setIsEditing(true); }}
+            className="w-full h-full cursor-pointer hover:bg-slate-50 flex items-center px-1 text-sm truncate text-zinc-900 font-medium"
+            title={value || "Click para editar (Comercial)"}
         >
             {value || <span className="text-zinc-300 italic">...</span>}
         </div>
@@ -519,18 +495,14 @@ const CotizacionCell = React.memo(({ getValue, row: { index, original }, column:
 CotizacionCell.displayName = "CotizacionCell"
 
 // Autorizacion Cell (Dropdown)
-// LOCKED unless user is Admin or Administracion
+// Granular: Depends on permissions.administracion.write
 const AutorizacionCell = React.memo(({ getValue, row: { index, original }, column: { id }, table }: EditableCellProps<ProgramacionServicio>) => {
     const value = getValue() as string
 
-    // Permission check: only Admin or Administracion can edit
-    const userRole = (table.options.meta as any)?.userRole?.toLowerCase() || ''
-    const canWrite = (table.options.meta as any)?.canWrite ?? false
-
-    const canEdit = canWrite && (
-        userRole.includes('admin') ||
-        userRole.includes('administracion')
-    )
+    // --- Granular Permissions Check ---
+    const meta = table.options.meta as any
+    const canWriteGlobal = meta?.canWrite ?? false
+    const canEdit = canWriteGlobal || meta?.permissions?.administracion?.write || false
 
     const handleChange = (newValue: string) => {
         if (!canEdit) return
@@ -551,10 +523,11 @@ AutorizacionCell.displayName = "AutorizacionCell"
 
 const PaymentStatusCell = React.memo(({ getValue, row, column: { id }, table }: EditableCellProps<ProgramacionServicio>) => {
     const value = getValue() as string
-    const userRole = (table.options.meta as any)?.userRole?.toLowerCase() || ''
-    const canWrite = (table.options.meta as any)?.canWrite ?? false
-    // Only Admin or Administracion can edit payment
-    const canEdit = canWrite && (userRole.includes('admin') || userRole.includes('administracion'))
+
+    // --- Granular Permissions Check ---
+    const meta = table.options.meta as any
+    const canWriteGlobal = meta?.canWrite ?? false
+    const canEdit = canWriteGlobal || meta?.permissions?.administracion?.write || false
 
     const onStatusChange = (newValue: string) => {
         if (!canEdit) return
@@ -568,7 +541,7 @@ const PaymentStatusCell = React.memo(({ getValue, row, column: { id }, table }: 
 })
 PaymentStatusCell.displayName = "PaymentStatusCell"
 
-export const columns: ColumnDef<ProgramacionServicio>[] = [
+export const columnsLab: ColumnDef<ProgramacionServicio>[] = [
     {
         accessorKey: "item_numero",
         header: ({ column }) => <SortableHeader column={column} title="ITEM" />,

@@ -1,158 +1,238 @@
+
 "use client"
 
 import React from "react"
 import { useSearchParams } from "next/navigation"
 import { DataTable } from "@/components/datagrid/data-table"
-import { columns } from "@/components/datagrid/columns"
+import { columnsLab } from "@/components/datagrid/columns"
+import { columnsComercial } from "@/components/datagrid/columns-comercial"
+import { columnsAdmin } from "@/components/datagrid/columns-admin"
 import { useProgramacionData } from "@/hooks/use-programacion-data"
-import { RefreshCw, Save, Wifi, WifiOff, FileDown, Info } from "lucide-react"
+import { RefreshCw, Save, Wifi, WifiOff, FileDown, Info, Lock } from "lucide-react"
 import { LoginButton } from "@/components/login-button"
 import { useCurrentUser } from "@/hooks/use-current-user"
 
 export function DatagridEditor() {
     const searchParams = useSearchParams()
     const modeParam = searchParams.get('mode')
-    const { loading: authLoading, role, allowedViews, canView, getCanWrite } = useCurrentUser()
+    const { loading: authLoading, role, allowedViews, getCanView, getCanWrite, needsAuth, permissions } = useCurrentUser()
 
-    // Initialize state based on URL param
+    // Initialize state based on URL param, with role-based fallback
+    const roleParam = searchParams.get('role') || ''
+
+    // Map role_ids directly to views (based on database values)
+    const roleToViewMap: Record<string, "LAB" | "COM" | "ADMIN"> = {
+        'admin': 'ADMIN',
+        'administrativo': 'ADMIN',
+        'vendor': 'COM',
+        'laboratorio_lector': 'LAB',
+        'laboratorio_tipificador': 'LAB'
+    }
+
+    // DEBUG: Log for diagnosis
+    console.log('[DatagridEditor] modeParam:', modeParam, '| roleParam:', roleParam)
+
     const [viewMode, setViewMode] = React.useState<"LAB" | "COM" | "ADMIN">(() => {
-        if (modeParam === 'comercial') return 'COM'
-        if (modeParam === 'admin') return 'ADMIN'
+        // First priority: explicit mode in URL
+        if (modeParam === 'comercial' || modeParam === 'com') {
+            console.log('[DatagridEditor] Mode from URL: COM')
+            return 'COM'
+        }
+        if (modeParam === 'admin') {
+            console.log('[DatagridEditor] Mode from URL: ADMIN')
+            return 'ADMIN'
+        }
+        if (modeParam === 'lab' || modeParam === 'laboratorio') {
+            console.log('[DatagridEditor] Mode from URL: LAB')
+            return 'LAB'
+        }
+
+        // Fallback: detect from role parameter using exact match
+        const rNorm = roleParam.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+        console.log('[DatagridEditor] rNorm from URL role:', rNorm)
+
+        if (roleToViewMap[rNorm]) {
+            console.log('[DatagridEditor] Exact role match:', rNorm, '->', roleToViewMap[rNorm])
+            return roleToViewMap[rNorm]
+        }
+
+        // Pattern matching fallback
+        if (rNorm.includes('admin') || rNorm.includes('geren') || rNorm.includes('direc') || rNorm.includes('jefe')) {
+            console.log('[DatagridEditor] Pattern match (admin):', rNorm)
+            return 'ADMIN'
+        }
+        if (rNorm.includes('comercial') || rNorm.includes('vendedor') || rNorm.includes('asesor') || rNorm.includes('vendor') || rNorm.includes('ventas')) {
+            console.log('[DatagridEditor] Pattern match (comercial):', rNorm)
+            return 'COM'
+        }
+        console.log('[DatagridEditor] Default to LAB')
         return 'LAB'
     })
 
+
     const canWrite = React.useMemo(() => getCanWrite(viewMode), [viewMode, getCanWrite])
 
-    // Enforce Permissions Logic
+    // Reactive sync with URL param (handles case where useState init misses it)
     React.useEffect(() => {
-        if (!authLoading && allowedViews.length > 0) {
-            // If current view is NOT allowed, switch to first allowed
-            if (!allowedViews.includes(viewMode)) {
+        if (modeParam === 'comercial' || modeParam === 'com') setViewMode('COM')
+        else if (modeParam === 'admin') setViewMode('ADMIN')
+        else if (modeParam === 'laboratorio' || modeParam === 'lab') setViewMode('LAB')
+    }, [modeParam])
+
+
+    // Enforce Permissions Logic: Sync view mode with allowed views
+    React.useEffect(() => {
+        if (!authLoading && !needsAuth && allowedViews.length > 0) {
+            // High-level role detection for bypass
+            const rNorm = (role || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+            const isHighLevel = rNorm.includes("admin") || rNorm.includes("geren") || rNorm.includes("administra") || rNorm.includes("direc") || rNorm.includes("jefe")
+
+            // Bypass security reset if we have high-level role or explicit permission
+            const hasAccess = isHighLevel || allowedViews.includes(viewMode)
+
+            if (!hasAccess) {
                 setViewMode(allowedViews[0])
             }
         }
-    }, [authLoading, allowedViews, viewMode])
+    }, [authLoading, needsAuth, allowedViews, viewMode, role])
 
     const { data, isLoading, realtimeStatus, updateField, insertRow, exportToExcel } = useProgramacionData()
 
-    // Dynamic Columns Import (lazy or static is fine here)
-    const { columns: labColumns } = require("@/components/datagrid/columns")
-    const { columns: comColumns } = require("@/components/datagrid/columns-comercial")
-    const { columns: adminColumns } = require("@/components/datagrid/columns-admin")
-
+    // Determine which columns to show based on view mode
     const currentColumns = React.useMemo(() => {
-        if (viewMode === "COM") return comColumns
-        if (viewMode === "ADMIN") return adminColumns
-        return labColumns
-    }, [viewMode, labColumns, comColumns, adminColumns])
+        if (viewMode === 'COM') return columnsComercial
+        if (viewMode === 'ADMIN') return columnsAdmin
+        return columnsLab
+    }, [viewMode])
 
+    // 1. Loading State
+    if (authLoading) {
+        return (
+            <div className="flex h-screen w-full items-center justify-center bg-zinc-50">
+                <div className="flex flex-col items-center gap-2">
+                    <RefreshCw className="w-8 h-8 text-blue-600 animate-spin" />
+                    <span className="text-zinc-500 text-sm font-medium">Verificando credenciales...</span>
+                </div>
+            </div>
+        )
+    }
+
+    // 2. Auth Required State (Direct access protection)
+    if (needsAuth) {
+        return (
+            <div className="flex h-screen w-full flex-col items-center justify-center bg-zinc-50 p-4">
+                <div className="w-full max-w-md bg-white rounded-xl shadow-xl border border-zinc-200 p-8 flex flex-col items-center text-center">
+                    <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mb-6">
+                        <Lock className="w-8 h-8 text-blue-600" />
+                    </div>
+                    <h2 className="text-2xl font-bold text-zinc-900 mb-2">Acceso Restringido</h2>
+                    <p className="text-zinc-500 mb-8 px-4">
+                        Para visualizar o editar la programación, debes iniciar sesión con tus credenciales de usuario.
+                    </p>
+                    <div className="w-full h-px bg-zinc-100 mb-8" />
+                    <LoginButton />
+                    <p className="mt-6 text-[11px] text-zinc-400 uppercase tracking-widest font-semibold font-mono">
+                        GEO-FAL S.A.S • Seguridad Interna
+                    </p>
+                </div>
+            </div>
+        )
+    }
+
+    // 3. Main Dashboard View
     return (
         <div className="flex flex-col h-screen bg-white">
-            {authLoading ? (
-                <div className="flex h-screen w-full items-center justify-center">
-                    <span className="text-zinc-500 text-sm animate-pulse">Verificando permisos...</span>
-                </div>
-            ) : (
-                <>
-                    {/* Header / Actions for the Page */}
-                    <div className="h-14 border-b border-zinc-200 flex items-center justify-between px-4 bg-white shrink-0">
-                        <div className="flex items-center gap-4">
-                            <div className="flex items-center gap-2">
-                                <div className="bg-blue-600 text-white p-1.5 rounded-md">
-                                    <RefreshCw className="w-4 h-4" />
-                                </div>
-                                <h1 className="font-semibold text-lg tracking-tight text-zinc-800">
-                                    Programación
-                                </h1>
-                                <span className="text-xs text-zinc-500 bg-zinc-100 px-2 py-0.5 rounded-full border border-zinc-200">
-                                    {data.length}
-                                </span>
-                            </div>
-
-                            {/* VIEW TOGGLE TABS */}
-                            <div className="flex bg-zinc-100 p-1 rounded-lg border border-zinc-200">
-                                {canView("LAB") && (
-                                    <button
-                                        onClick={() => setViewMode("LAB")}
-                                        className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${viewMode === "LAB" ? "bg-white text-blue-600 shadow-sm" : "text-zinc-500 hover:text-zinc-700"}`}
-                                    >
-                                        Laboratorio
-                                    </button>
-                                )}
-                                {canView("COM") && (
-                                    <button
-                                        onClick={() => setViewMode("COM")}
-                                        className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${viewMode === "COM" ? "bg-white text-blue-600 shadow-sm" : "text-zinc-500 hover:text-zinc-700"}`}
-                                    >
-                                        Comercial
-                                    </button>
-                                )}
-                                {canView("ADMIN") && (
-                                    <button
-                                        onClick={() => setViewMode("ADMIN")}
-                                        className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${viewMode === "ADMIN" ? "bg-white text-blue-600 shadow-sm" : "text-zinc-500 hover:text-zinc-700"}`}
-                                    >
-                                        Administración
-                                    </button>
-                                )}
-                                {allowedViews.length === 0 && !authLoading && (
-                                    <span className="px-2.5 py-1 text-[10px] uppercase font-bold text-zinc-500 bg-zinc-50 border border-zinc-200 rounded-md flex items-center gap-1.5 cursor-default">
-                                        <Info className="w-3 h-3 text-zinc-400" />
-                                        Modo Consulta
-                                    </span>
-                                )}
-                                {!canWrite && (
-                                    <span className="ml-2 px-2.5 py-1 text-[10px] uppercase font-bold text-amber-600 bg-amber-50 border border-amber-200 rounded-md flex items-center gap-1.5 cursor-default" title="Solo lectura para esta vista">
-                                        <Info className="w-3 h-3" />
-                                        Solo Lectura
-                                    </span>
-                                )}
-                            </div>
+            {/* Header / Actions */}
+            <div className="h-14 border-b border-zinc-200 flex items-center justify-between px-4 bg-white shrink-0 shadow-sm z-10">
+                <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2">
+                        <div className="bg-blue-600 text-white p-1.5 rounded-md shadow-sm">
+                            <RefreshCw className="w-4 h-4" />
                         </div>
+                        <h1 className="font-semibold text-lg tracking-tight text-zinc-800">
+                            Programación
+                        </h1>
+                        <span className="text-xs text-zinc-500 bg-zinc-100 px-2 py-0.5 rounded-full border border-zinc-200 font-mono">
+                            {data.length}
+                        </span>
+                    </div>
 
-                        <div className="flex items-center gap-3">
+                    {/* VIEW TOGGLE TABS */}
+                    <div className="flex bg-zinc-100 p-1 rounded-lg border border-zinc-200">
+                        {getCanView("LAB") && (
                             <button
-                                onClick={() => exportToExcel(data)}
-                                disabled={data.length === 0}
-                                className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-xs font-medium transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                                onClick={() => setViewMode("LAB")}
+                                className={`px-4 py-1 text-xs font-semibold rounded-md transition-all ${viewMode === "LAB" ? "bg-white text-blue-600 shadow-sm" : "text-zinc-500 hover:text-zinc-700"}`}
                             >
-                                <FileDown className="w-3.5 h-3.5" />
-                                <span>Exportar</span>
+                                Laboratorio
                             </button>
+                        )}
+                        {getCanView("COM") && (
+                            <button
+                                onClick={() => setViewMode("COM")}
+                                className={`px-4 py-1 text-xs font-semibold rounded-md transition-all ${viewMode === "COM" ? "bg-white text-blue-600 shadow-sm" : "text-zinc-500 hover:text-zinc-700"}`}
+                            >
+                                Comercial
+                            </button>
+                        )}
+                        {getCanView("ADMIN") && (
+                            <button
+                                onClick={() => setViewMode("ADMIN")}
+                                className={`px-4 py-1 text-xs font-semibold rounded-md transition-all ${viewMode === "ADMIN" ? "bg-white text-blue-600 shadow-sm" : "text-zinc-500 hover:text-zinc-700"}`}
+                            >
+                                Administración
+                            </button>
+                        )}
+                    </div>
 
-                            <div className="flex items-center gap-3">
-                                {/* Status Indicator */}
-                                <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-zinc-50 border border-zinc-200" title={`Estado Realtime: ${realtimeStatus}`}>
-                                    {realtimeStatus === "SUBSCRIBED" ? (
-                                        <Wifi className="w-3.5 h-3.5 text-emerald-500" />
-                                    ) : (
-                                        <WifiOff className="w-3.5 h-3.5 text-red-500" />
-                                    )}
-                                    <span className="text-[10px] uppercase font-bold text-zinc-500 hidden sm:inline">
-                                        {realtimeStatus === "SUBSCRIBED" ? "Online" : "Offline"}
-                                    </span>
-                                </div>
+                    {!canWrite && (
+                        <span className="px-2.5 py-1 text-[10px] uppercase font-bold text-amber-600 bg-amber-50 border border-amber-200 rounded-md flex items-center gap-1.5 cursor-default" title="Solo lectura para esta vista">
+                            <Info className="w-3 h-3" />
+                            Vista Solo Lectura
+                        </span>
+                    )}
+                </div>
 
-                                {isLoading && <span className="text-xs text-blue-500 animate-pulse">Sincronizando...</span>}
-                            </div>
+                <div className="flex items-center gap-3">
+                    <button
+                        onClick={() => exportToExcel(data)}
+                        disabled={data.length === 0}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-xs font-medium transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        <FileDown className="w-3.5 h-3.5" />
+                        <span>Exportar Excel</span>
+                    </button>
+
+                    <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-zinc-50 border border-zinc-200 shadow-inner" title={`Estado Realtime: ${realtimeStatus}`}>
+                            {realtimeStatus === "SUBSCRIBED" ? (
+                                <Wifi className="w-3.5 h-3.5 text-emerald-500" />
+                            ) : (
+                                <WifiOff className="w-3.5 h-3.5 text-red-500 animate-pulse" />
+                            )}
+                            <span className="text-[10px] uppercase font-bold text-zinc-500 hidden sm:inline">
+                                {realtimeStatus === "SUBSCRIBED" ? "En Línea" : "Sin Conexión"}
+                            </span>
                         </div>
+                        {isLoading && <span className="text-xs text-blue-500 animate-pulse font-medium">Sincronizando...</span>}
                     </div>
+                </div>
+            </div>
 
-                    {/* Main Content Area */}
-                    <div className="flex-1 overflow-hidden">
-                        <DataTable
-                            columns={currentColumns}
-                            data={data}
-                            loading={isLoading}
-                            onUpdate={updateField}
-                            onInsert={canWrite ? insertRow : undefined}
-                            userRole={role || ''}
-                            canWrite={canWrite}
-                            key={viewMode} // Force remount on view change to reset table state (pinning, etc)
-                        />
-                    </div>
-                </>
-            )}
+            {/* Main Content Area */}
+            <div className="flex-1 overflow-hidden bg-zinc-50 p-1">
+                <DataTable
+                    columns={currentColumns as any}
+                    data={data}
+                    loading={isLoading}
+                    onUpdate={updateField}
+                    onInsert={canWrite ? insertRow : undefined}
+                    userRole={role || ''}
+                    canWrite={canWrite}
+                    permissions={permissions}
+                    key={viewMode} // Force remount on view change to reset table state
+                />
+            </div>
         </div>
     )
 }

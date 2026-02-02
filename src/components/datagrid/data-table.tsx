@@ -32,6 +32,7 @@ declare module '@tanstack/react-table' {
         updateData: (rowId: string, columnId: string, value: unknown) => void
         userRole?: string
         canWrite?: boolean
+        permissions?: any
     }
 }
 
@@ -43,6 +44,7 @@ interface DataTableProps<TData, TValue> {
     onInsert?: (data: Partial<TData>) => Promise<void>
     userRole?: string
     canWrite?: boolean
+    permissions?: any
 }
 
 export function DataTable<TData, TValue>({
@@ -52,7 +54,8 @@ export function DataTable<TData, TValue>({
     onUpdate,
     onInsert,
     userRole,
-    canWrite
+    canWrite,
+    permissions
 }: DataTableProps<TData, TValue>) {
     const [sorting, setSorting] = React.useState<SortingState>([])
     const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
@@ -108,6 +111,7 @@ export function DataTable<TData, TValue>({
             },
             userRole: userRole || '',
             canWrite: canWrite ?? false,
+            permissions: permissions || null
         },
     })
 

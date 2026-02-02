@@ -1,366 +1,21 @@
+
 "use client"
 
-import { Column, ColumnDef, RowData, Table } from "@tanstack/react-table"
+import { Column, ColumnDef } from "@tanstack/react-table"
 import { ProgramacionServicio } from "@/types/programacion"
 import React from "react"
 import { ArrowUpDown } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { StatusSelect } from "./status-select"
-import { AuthorizationSelect } from "./authorization-select"
-import { PaymentSelect } from "./payment-select"
 
-// Helper Components (Duplicated for isolation as requested)
-
-interface EditableCellProps<TData> {
-    getValue: () => unknown
-    row: { index: number, original: TData }
-    column: { id: string }
-    table: Table<TData>
-    className?: string
-}
-
-const EditableCell = React.memo(({ getValue, row, column: { id }, table, className }: EditableCellProps<ProgramacionServicio>) => {
-    const { index, original } = row
-    const initialValue = getValue()
-    const [value, setValue] = React.useState(initialValue)
-    const [isFocused, setIsFocused] = React.useState(false)
-
-    React.useEffect(() => { setValue(initialValue) }, [initialValue])
-
-    const canWrite = (table.options.meta as any)?.canWrite ?? false
-
-    const onBlur = () => {
-        setIsFocused(false)
-        if (!canWrite) return
-        if (value !== initialValue) {
-            table.options.meta?.updateData((original as any).id, id, value)
-        }
-    }
-
-    const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement | HTMLInputElement>) => {
-        if (e.key === 'Enter') {
-            e.preventDefault()
-            e.currentTarget.blur()
-            setTimeout(() => {
-                const allInputs = Array.from(document.querySelectorAll('input:not([type="hidden"]), textarea, select')) as HTMLElement[];
-                const currentElement = e.target as HTMLElement;
-                const currentIndex = allInputs.indexOf(currentElement);
-                if (currentIndex !== -1 && currentIndex < allInputs.length - 1) {
-                    allInputs[currentIndex + 1].focus();
-                    if (allInputs[currentIndex + 1] instanceof HTMLInputElement) {
-                        (allInputs[currentIndex + 1] as HTMLInputElement).select();
-                    }
-                }
-            }, 0)
-        }
-    }
-
-    const isDate = id.includes('fecha') || id === 'entrega_real'
-    const textSize = className?.includes('text-') ? '' : 'text-sm'
-
-    // For Comercial view, we might prefer SmartDateCell, but if basic date is needed fallback here.
-    if (!canWrite) {
-        return (
-            <div className={cn("px-1 py-1 truncate cursor-not-allowed opacity-70", textSize, className)} title="Vista Solo Lectura">
-                {isDate ? (value ? new Date(value as string).toLocaleDateString() : "-") : (value as string || "-")}
-            </div>
-        )
-    }
-
-    if (isDate) {
-        return (
-            <input
-                type="date"
-                value={(value as string)?.split('T')[0] ?? ""}
-                onChange={e => setValue(e.target.value)}
-                onBlur={onBlur}
-                onKeyDown={onKeyDown}
-                onFocus={() => setIsFocused(true)}
-                className={cn(
-                    "w-full bg-transparent border-none focus:outline-none focus:ring-1 focus:ring-blue-500 rounded px-1 -mx-1 h-full text-zinc-900 placeholder:text-zinc-400",
-                    textSize,
-                    className
-                )}
-            />
-        )
-    }
-
-    return (
-        <textarea
-            value={(value as string) ?? ""}
-            onChange={e => setValue(e.target.value)}
-            onBlur={onBlur}
-            onKeyDown={onKeyDown}
-            onFocus={() => setIsFocused(true)}
-            rows={1}
-            style={{ fieldSizing: "content", minHeight: "1.5em", resize: "none" } as any}
-            className={cn(
-                "w-full bg-transparent border-none focus:outline-none focus:ring-1 focus:ring-blue-500 rounded px-1 -mx-1 resize-none overflow-hidden block leading-tight whitespace-pre-wrap py-1 text-zinc-900 placeholder:text-zinc-400",
-                textSize,
-                className
-            )}
-        />
-    )
-})
-EditableCell.displayName = "EditableCell"
-
-const SmartDateCell = React.memo(({ getValue, row: { index, original }, column: { id }, table }: EditableCellProps<ProgramacionServicio>) => {
-    const rawValue = getValue() as string
-    const formatDisplay = (val: string) => {
-        if (!val) return ""
-        try {
-            const date = new Date(val)
-            if (isNaN(date.getTime())) return val
-            const d = String(date.getUTCDate()).padStart(2, '0')
-            const m = String(date.getUTCMonth() + 1).padStart(2, '0')
-            const y = String(date.getUTCFullYear()).slice(-2)
-            return `${d}/${m}/${y}`
-        } catch { return val }
-    }
-
-    const [inputValue, setInputValue] = React.useState(formatDisplay(rawValue))
-    const [isEditing, setIsEditing] = React.useState(false)
-
-    React.useEffect(() => { setInputValue(formatDisplay(rawValue)) }, [rawValue])
-
-    const onBlur = () => {
-        setIsEditing(false)
-        let finalVal = inputValue.trim()
-
-        // Smart Parsing Logic
-        let valToParse = finalVal
-        if (/^\d{3}$/.test(valToParse)) {
-            valToParse = "0" + valToParse
-        }
-        const shortDateRegex = /^(\d{1,2})[./-](\d{1,2})$/
-        const numericMatch = valToParse.match(/^(\d{2})(\d{2})(\d{2}|\d{4})?$/)
-        const match = valToParse.match(shortDateRegex)
-
-        let isoDate = null
-
-        if (numericMatch) {
-            const day = numericMatch[1]
-            const month = numericMatch[2]
-            let year = numericMatch[3] || "2026"
-            if (year.length === 2) year = "20" + year
-            isoDate = `${year}-${month}-${day}`
-            const testDate = new Date(isoDate)
-            if (isNaN(testDate.getTime())) isoDate = null
-        } else if (match) {
-            const day = match[1].padStart(2, '0')
-            const month = match[2].padStart(2, '0')
-            const year = "2026"
-            isoDate = `${year}-${month}-${day}`
-            const testDate = new Date(isoDate)
-            if (isNaN(testDate.getTime())) isoDate = null
-        } else {
-            const fullDateRegex = /^(\d{1,2})[./-](\d{1,2})[./-](\d{4}|\d{2})$/
-            const fullMatch = finalVal.match(fullDateRegex)
-            if (fullMatch) {
-                const d = fullMatch[1].padStart(2, '0')
-                const m = fullMatch[2].padStart(2, '0')
-                let y = fullMatch[3]
-                if (y.length === 2) y = "20" + y
-                isoDate = `${y}-${m}-${d}`
-            }
-        }
-        if (isoDate) {
-            table.options.meta?.updateData((original as any).id, id, isoDate)
-            setInputValue(formatDisplay(isoDate))
-        } else if (inputValue === "") {
-            table.options.meta?.updateData((original as any).id, id, null)
-        } else {
-            setInputValue(formatDisplay(rawValue))
-        }
-    }
-
-    const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-        if (e.key === 'Enter') {
-            e.preventDefault(); e.currentTarget.blur()
-            setTimeout(() => {
-                const allInputs = Array.from(document.querySelectorAll('input:not([type="hidden"]), textarea, select')) as HTMLElement[];
-                const currentElement = e.target as HTMLElement;
-                const currentIndex = allInputs.indexOf(currentElement);
-                if (currentIndex !== -1 && currentIndex < allInputs.length - 1) {
-                    allInputs[currentIndex + 1].focus();
-                    if (allInputs[currentIndex + 1] instanceof HTMLInputElement) {
-                        (allInputs[currentIndex + 1] as HTMLInputElement).select();
-                    }
-                }
-            }, 0)
-        }
-    }
-
-    const canWrite = (table.options.meta as any)?.canWrite ?? false
-
-    if (!canWrite) {
-        return (
-            <div className="w-full h-full cursor-not-allowed opacity-70 flex items-center px-1 text-zinc-500" title="Vista Solo Lectura">
-                {inputValue || "--/--"}
-            </div>
-        )
-    }
-
-    if (isEditing) {
-        return (
-            <input autoFocus type="text" value={inputValue} onChange={e => setInputValue(e.target.value)} onBlur={onBlur} onKeyDown={onKeyDown} placeholder="dd/mm" className="w-full bg-white border border-blue-400 rounded px-1 -mx-1 h-full text-zinc-900 font-medium" />
-        )
-    }
-    return (
-        <div onClick={() => { setIsEditing(true); }} className="w-full h-full cursor-pointer hover:bg-zinc-100/50 flex items-center px-1 text-zinc-900">
-            {inputValue || <span className="text-zinc-300">--/--</span>}
-        </div>
-    )
-})
-SmartDateCell.displayName = "SmartDateCell"
-
-const OTCell = React.memo(({ getValue, row, column: { id }, table }: EditableCellProps<ProgramacionServicio>) => {
-    const { index, original } = row
-    const rawValue = getValue() as string
-    const initialDisplayValue = rawValue ? rawValue.replace(/LEM/i, '').trim() : ""
-    const [value, setValue] = React.useState(initialDisplayValue)
-
-    React.useEffect(() => { setValue(rawValue ? rawValue.replace(/LEM/i, '').trim() : "") }, [rawValue])
-
-    const onBlur = () => {
-        const finalValue = value.trim()
-        if (finalValue !== initialDisplayValue) table.options.meta?.updateData((original as any).id, id, finalValue)
-    }
-
-    const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-        if (e.key === 'Enter') {
-            e.preventDefault(); e.currentTarget.blur()
-            setTimeout(() => {
-                const allInputs = Array.from(document.querySelectorAll('input:not([type="hidden"]), textarea, select')) as HTMLElement[];
-                const currentElement = e.target as HTMLElement;
-                const currentIndex = allInputs.indexOf(currentElement);
-                if (currentIndex !== -1 && currentIndex < allInputs.length - 1) {
-                    allInputs[currentIndex + 1].focus();
-                    if (allInputs[currentIndex + 1] instanceof HTMLInputElement) {
-                        (allInputs[currentIndex + 1] as HTMLInputElement).select();
-                    }
-                }
-            }, 0)
-        }
-    }
-    const canWrite = (table.options.meta as any)?.canWrite ?? false
-
-    if (!canWrite) {
-        return <div className="px-1 py-1 truncate cursor-not-allowed opacity-70 text-zinc-500 h-full flex items-center">{value || "-"}</div>
-    }
-
-    return <input value={value} onChange={e => setValue(e.target.value)} onBlur={onBlur} onKeyDown={onKeyDown} className="w-full bg-white border-none focus:outline-none focus:ring-1 focus:ring-blue-500 rounded px-2 -mx-1 h-full text-zinc-900 font-medium" placeholder="OT #" />
-})
-OTCell.displayName = "OTCell"
-
-const CotizacionCell = React.memo(({ getValue, row, column: { id }, table }: EditableCellProps<ProgramacionServicio>) => {
-    const { index, original } = row
-    const value = getValue() as string
-    const [isEditing, setIsEditing] = React.useState(false)
-    const [inputValue, setInputValue] = React.useState(value || "")
-
-    // Permission check: only Admin, Comercial or Administracion can edit
-    const userRole = (table.options.meta as any)?.userRole?.toLowerCase() || ''
-    const canWrite = (table.options.meta as any)?.canWrite ?? false
-    const canEdit = canWrite && (userRole.includes('admin') || userRole.includes('comercial') || userRole.includes('administracion'))
-
-    const onBlur = () => {
-        setIsEditing(false)
-        let finalValue = inputValue.trim()
-        if (finalValue && /^\d+$/.test(finalValue)) {
-            finalValue = `COTIZ.N-${finalValue}-26`
-        } else if (finalValue.startsWith("COTIZACION-")) {
-            finalValue = finalValue.replace("COTIZACION-", "COTIZ.N-")
-        }
-        if (finalValue !== value) {
-            table.options.meta?.updateData((original as any).id, id, finalValue)
-        }
-    }
-
-    const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-        if (e.key === 'Enter') {
-            e.preventDefault(); e.currentTarget.blur()
-            setTimeout(() => {
-                const allInputs = Array.from(document.querySelectorAll('input:not([type="hidden"]), textarea, select')) as HTMLElement[];
-                const currentElement = e.target as HTMLElement;
-                const currentIndex = allInputs.indexOf(currentElement);
-                if (currentIndex !== -1 && currentIndex < allInputs.length - 1) {
-                    allInputs[currentIndex + 1].focus();
-                    if (allInputs[currentIndex + 1] instanceof HTMLInputElement) {
-                        (allInputs[currentIndex + 1] as HTMLInputElement).select();
-                    }
-                }
-            }, 0)
-        }
-    }
-
-    if (isEditing && canEdit) {
-        return (
-            <input autoFocus value={inputValue} onChange={e => setInputValue(e.target.value)} onBlur={onBlur} onKeyDown={onKeyDown} className="w-full h-full bg-white border border-blue-300 rounded text-sm p-1 text-zinc-900 font-medium" placeholder="Ej: 123" />
-        )
-    }
-
-    return (
-        <div
-            onClick={() => {
-                if (!canEdit) return
-                setInputValue(value || "");
-                setIsEditing(true);
-            }}
-            className={cn(
-                "w-full h-full flex items-center px-1 text-sm truncate",
-                canEdit ? "cursor-pointer hover:bg-slate-50 text-zinc-900" : "cursor-not-allowed text-zinc-500 opacity-70"
-            )}
-            title={!canEdit ? "No tienes permisos para editar cotizaciones" : (value || "Click para editar")}
-        >
-            {value || <span className="text-zinc-300 italic">...</span>}
-        </div>
-    )
-})
-CotizacionCell.displayName = "CotizacionCell"
-
-const CodigoMuestraCell = React.memo(({ getValue, row, column: { id }, table }: EditableCellProps<ProgramacionServicio>) => {
-    const { index, original } = row
-    const value = getValue() as string
-    const [isEditing, setIsEditing] = React.useState(false)
-    const [inputValue, setInputValue] = React.useState(value || "")
-
-    const onBlur = () => {
-        setIsEditing(false)
-        if (inputValue !== value) {
-            table.options.meta?.updateData((original as any).id, id, inputValue)
-        }
-    }
-
-    const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-        if (e.key === 'Enter') {
-            e.preventDefault(); e.currentTarget.blur()
-            setTimeout(() => {
-                const allInputs = Array.from(document.querySelectorAll('input:not([type="hidden"]), textarea, select')) as HTMLElement[];
-                const currentElement = e.target as HTMLElement;
-                const currentIndex = allInputs.indexOf(currentElement);
-                if (currentIndex !== -1 && currentIndex < allInputs.length - 1) {
-                    allInputs[currentIndex + 1].focus();
-                    if (allInputs[currentIndex + 1] instanceof HTMLInputElement) {
-                        (allInputs[currentIndex + 1] as HTMLInputElement).select();
-                    }
-                }
-            }, 0)
-        }
-    }
-
-    if (isEditing) {
-        return <input autoFocus value={inputValue} onChange={e => setInputValue(e.target.value)} onBlur={onBlur} onKeyDown={onKeyDown} className="w-full h-full bg-white border border-blue-300 rounded text-sm px-1 font-medium text-zinc-900" />
-    }
-
-    return (
-        <div onClick={() => { setInputValue(value || ""); setIsEditing(true); }} className="w-full h-full cursor-pointer bg-white hover:bg-slate-50 flex items-center px-1 text-sm truncate text-zinc-900 font-medium whitespace-nowrap overflow-hidden" title={value || "Click para editar"}>
-            {value || <span className="text-zinc-300 italic">...</span>}
-        </div>
-    )
-})
-CodigoMuestraCell.displayName = "CodigoMuestraCell"
-
+// Import shared smart cells from the main columns file
+import {
+    EditableCell,
+    OTCell,
+    SmartDateCell,
+    CotizacionCell,
+    AutorizacionCell,
+    PaymentStatusCell
+} from "./columns"
 
 const SortableHeader = ({ column, title, className }: { column: Column<ProgramacionServicio, unknown>, title: string, className?: string }) => {
     return (
@@ -374,54 +29,7 @@ const SortableHeader = ({ column, title, className }: { column: Column<Programac
     )
 }
 
-// Autorizacion Cell (Dropdown)
-// LOCKED unless user is Admin, Comercial or Administracion
-const AutorizacionCell = React.memo(({ getValue, row, column: { id }, table }: EditableCellProps<ProgramacionServicio>) => {
-    const { index, original } = row
-    const value = getValue() as string
-
-    // Permission check: Laboratorio CANNOT edit authorization
-    const userRole = (table.options.meta as any)?.userRole?.toLowerCase() || ''
-    const canWrite = (table.options.meta as any)?.canWrite ?? false
-    const canEdit = canWrite && (userRole.includes('admin') || userRole.includes('administracion') || userRole.includes('comercial'))
-
-    const handleChange = (newValue: string) => {
-        if (!canEdit) return
-        table.options.meta?.updateData((original as any).id, id, newValue)
-    }
-
-    return (
-        <div className="w-full h-full flex items-center justify-center p-1">
-            <AuthorizationSelect
-                value={value}
-                onChange={handleChange}
-                disabled={!canEdit}
-            />
-        </div>
-    )
-})
-AutorizacionCell.displayName = "AutorizacionCell"
-
-const PaymentStatusCell = React.memo(({ getValue, row, column: { id }, table }: EditableCellProps<ProgramacionServicio>) => {
-    const value = getValue() as string
-    const userRole = (table.options.meta as any)?.userRole?.toLowerCase() || ''
-    const canWrite = (table.options.meta as any)?.canWrite ?? false
-    // Only Admin or Administracion can edit payment
-    const canEdit = canWrite && (userRole.includes('admin') || userRole.includes('administracion'))
-
-    const onStatusChange = (newValue: string) => {
-        if (!canEdit) return
-        table.options.meta?.updateData((row.original as any).id, id, newValue)
-    }
-    return (
-        <div className={cn("w-full h-full flex items-center justify-center p-1", !canEdit && "cursor-not-allowed")}>
-            <PaymentSelect value={value} onChange={onStatusChange} disabled={!canEdit} />
-        </div>
-    )
-})
-PaymentStatusCell.displayName = "PaymentStatusCell"
-
-export const columns: ColumnDef<ProgramacionServicio>[] = [
+export const columnsComercial: ColumnDef<ProgramacionServicio>[] = [
     {
         accessorKey: "item_numero",
         header: ({ column }) => <SortableHeader column={column} title="ITEM" />,
@@ -454,7 +62,7 @@ export const columns: ColumnDef<ProgramacionServicio>[] = [
         accessorKey: "proyecto",
         header: ({ column }) => <SortableHeader column={column} title="PROYECTO" />,
         size: 200, minSize: 150, maxSize: 500, enableResizing: true,
-        cell: (props) => <EditableCell {...props} className="text-zinc-900 font-medium" />,
+        cell: (props: any) => <EditableCell {...props} className="text-zinc-900 font-medium" />,
     },
     {
         accessorKey: "cotizacion_lab",
@@ -478,7 +86,7 @@ export const columns: ColumnDef<ProgramacionServicio>[] = [
         accessorKey: "evidencia_solicitud_envio",
         header: ({ column }) => <SortableHeader column={column} title={`EVIDENCIA SOLICITUD - ENVIO\n- ACEPTACION COTIZ`} />,
         size: 250, minSize: 200, maxSize: 500, enableResizing: true,
-        cell: (props) => <EditableCell {...props} className="text-zinc-800 text-[12px] text-center" />,
+        cell: (props: any) => <EditableCell {...props} className="text-zinc-800 text-[12px] text-center" />,
     },
     {
         accessorKey: "dias_atraso_envio_coti",
@@ -514,7 +122,7 @@ export const columns: ColumnDef<ProgramacionServicio>[] = [
         accessorKey: "motivo_dias_atraso_com",
         header: ({ column }) => <SortableHeader column={column} title={`MOTIVO\nDIAS ATRASO`} />,
         size: 200, minSize: 150, maxSize: 600, enableResizing: true,
-        cell: (props) => <EditableCell {...props} className="text-zinc-800 text-[12px]" />,
+        cell: (props: any) => <EditableCell {...props} className="text-zinc-800 text-[12px]" />,
     },
     {
         accessorKey: "estado_pago",

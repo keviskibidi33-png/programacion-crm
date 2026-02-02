@@ -21,55 +21,98 @@ export function useCurrentUser() {
     const [role, setRole] = useState<string | null>(qRole)
     const [loading, setLoading] = useState(true)
     const [userId, setUserId] = useState<string | null>(qUserId)
+    const [needsAuth, setNeedsAuth] = useState(false)
 
     const [allowedViews, setAllowedViews] = useState<ViewMode[]>(() => {
+        // Optimistic Initialization: Start with LABORATORY + whatever the URL explicitly asks for
         const views: ViewMode[] = ["LAB"]
-        if (qIsAdmin || (qRole && (qRole.includes("admin") || qRole.includes("gerencia") || qRole.includes("administra")))) {
-            views.push("COM", "ADMIN")
+        const qMode = searchParams.get("mode")?.toUpperCase()
+        if (qMode === "COMERCIAL" || qMode === "COM") views.push("COM")
+        if (qMode === "ADMIN") views.push("ADMIN")
+
+        // Role-based heuristics for initial state (Inclusive matching)
+        const rNorm = (qRole || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+        const isHighLevel = qIsAdmin || rNorm.includes("admin") || rNorm.includes("geren") || rNorm.includes("administra") || rNorm.includes("direc") || rNorm.includes("jefe")
+
+        if (isHighLevel) {
+            if (!views.includes("COM")) views.push("COM")
+            if (!views.includes("ADMIN")) views.push("ADMIN")
         }
-        return views
+
+        // Remove duplicates and return
+        return Array.from(new Set(views)) as ViewMode[]
     })
 
     const [permissions, setPermissions] = useState<any>(() => {
-        if (!qRole) return null
+        // Initial permissions based on URL flags until DB load completes
+        const rNorm = (qRole || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+        const isHighLevel = qIsAdmin || rNorm.includes("admin") || rNorm.includes("geren") || rNorm.includes("administra") || rNorm.includes("direc") || rNorm.includes("jefe")
+        const dynamicCanWrite = qCanWrite || isHighLevel
+
         return {
-            laboratorio: { read: true, write: qCanWrite, delete: false },
-            programacion: { read: true, write: qCanWrite, delete: false },
-            comercial: { read: true, write: qCanWrite, delete: false },
-            administracion: { read: true, write: qCanWrite, delete: false }
+            laboratorio: { read: true, write: dynamicCanWrite, delete: false },
+            programacion: { read: true, write: dynamicCanWrite, delete: false },
+            comercial: { read: true, write: dynamicCanWrite, delete: false },
+            administracion: { read: true, write: dynamicCanWrite, delete: false }
         }
     })
 
     useEffect(() => {
-        // 1. Sync identity state with reactive URL params
-        if (qRole) setRole(qRole)
-        if (qUserId) setUserId(qUserId)
+        async function fetchIdentityAndPerms() {
+            setLoading(true)
 
-        // 2. Initial view calculation based on URL Role/Admin flags
-        const views: ViewMode[] = ["LAB"]
-        if (qIsAdmin || (qRole && (qRole.includes("admin") || qRole.includes("gerencia") || qRole.includes("administra")))) {
-            views.push("COM", "ADMIN")
-        }
-        setAllowedViews(views)
+            // 1. Get User ID (either from URL or Supabase Session)
+            let currentUid = qUserId
+            let sourceOfTruthIsUrl = !!qUserId
 
-        // 3. Deep Permissions Fetch from Supabase
-        async function fetchRoleDetails() {
-            if (!qUserId || !qRole) {
-                setLoading(false)
-                return
+            if (!currentUid) {
+                const { data: { session } } = await supabase.auth.getSession()
+                if (session) {
+                    currentUid = session.user.id
+                    setUserId(currentUid)
+                } else {
+                    // NO USER DETECTED AT ALL
+                    setNeedsAuth(true)
+                    setLoading(false)
+                    return
+                }
+            } else {
+                setUserId(currentUid)
+                setNeedsAuth(false)
             }
 
+            // 2. Sync basic identity state
+            if (qRole) setRole(qRole)
+
+            // 3. Optimized view calculation based on URL Role/Admin flags & requested mode
+            const views: ViewMode[] = ["LAB"]
+            const qMode = searchParams.get("mode")?.toUpperCase()
+            if (qMode === "COMERCIAL" || qMode === "COM") views.push("COM")
+            if (qMode === "ADMIN") views.push("ADMIN")
+
+            const rNorm = (qRole || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+            const isHighLevel = qIsAdmin || rNorm.includes("admin") || rNorm.includes("geren") || rNorm.includes("administra") || rNorm.includes("direc") || rNorm.includes("jefe")
+            if (isHighLevel) {
+                if (!views.includes("COM")) views.push("COM")
+                if (!views.includes("ADMIN")) views.push("ADMIN")
+            }
+            setAllowedViews(Array.from(new Set(views)) as ViewMode[])
+
+            // 4. Fetch Profile & Permissions Matrix
             try {
-                const { data } = await supabase
+                const { data: profile } = await supabase
                     .from("perfiles")
                     .select("role, role_definitions!fk_perfiles_role(permissions)")
-                    .eq("id", qUserId)
+                    .eq("id", currentUid)
                     .single()
 
-                if (data) {
-                    const roleDef = Array.isArray((data as any).role_definitions)
-                        ? (data as any).role_definitions[0]
-                        : (data as any).role_definitions
+                if (profile) {
+                    const dbRole = profile.role?.toLowerCase()
+                    if (!sourceOfTruthIsUrl) setRole(dbRole)
+
+                    const roleDef = Array.isArray((profile as any).role_definitions)
+                        ? (profile as any).role_definitions[0]
+                        : (profile as any).role_definitions
 
                     const dbPerms = roleDef?.permissions
                     if (dbPerms && Object.keys(dbPerms).length > 0) {
@@ -80,8 +123,11 @@ export function useCurrentUser() {
                         if (dbPerms.comercial?.read) dbViews.push("COM")
                         if (dbPerms.administracion?.read) dbViews.push("ADMIN")
 
-                        // Admin override for views
-                        if (qIsAdmin || data.role.toLowerCase().includes("admin") || data.role.toLowerCase().includes("gerencia")) {
+                        // High-level overrides (Recursive fallback)
+                        const dbRoleNorm = (dbRole || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+                        const isHighLevelDb = qIsAdmin || dbRoleNorm.includes("admin") || dbRoleNorm.includes("geren") || dbRoleNorm.includes("administra") || dbRoleNorm.includes("direc") || dbRoleNorm.includes("jefe")
+
+                        if (isHighLevelDb) {
                             setAllowedViews(["LAB", "COM", "ADMIN"])
                         } else if (dbViews.length > 0) {
                             setAllowedViews([...new Set(dbViews)])
@@ -89,38 +135,43 @@ export function useCurrentUser() {
                     }
                 }
             } catch (e) {
-                console.log("[Auth] Fallback to URL-based permissions")
+                console.log("[Auth] Fallback - Iframe running with URL context")
             } finally {
                 setLoading(false)
             }
         }
 
-        fetchRoleDetails()
+        fetchIdentityAndPerms()
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [urlKey, supabase]) // STABLE SIZE: Only 2 dependencies. Fixes "changed size between renders" issues.
+    }, [urlKey, supabase])
 
     return {
         userId,
         role,
         loading,
+        needsAuth,
         allowedViews,
         permissions,
-        canView: (mode: ViewMode) => allowedViews.includes(mode),
+        getCanView: (mode: ViewMode) => allowedViews.includes(mode),
         getCanWrite: (mode: ViewMode) => {
-            // Priority 1: Instant URL Overrides (Fast Path for Iframe)
-            if (qIsAdmin || (qRole && (qRole.includes("admin") || qRole.includes("gerencia")))) return true
+            // Priority 1: Instant URL Overrides (for smooth Iframe experience)
+            if (qIsAdmin) return true
             if (qCanWrite) return true
 
-            // Priority 2: Reactive Role state
-            if (!role) return false
-            if (role.toLowerCase().includes("admin") || role.toLowerCase().includes("gerencia")) return true
+            // Priority 2: Role-based Bypass (for Management)
+            const rNorm = (role || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+            if (rNorm.includes("admin") || rNorm.includes("geren") || rNorm.includes("administra") || rNorm.includes("direc") || rNorm.includes("jefe")) return true
 
-            // Priority 3: Granular Database Permissions
+            // Priority 3: Granular Matrix Permissions (The "Security Guard")
             if (mode === "LAB") {
                 return permissions?.laboratorio?.write || permissions?.programacion?.write || false
             }
-            if (mode === "COM") return permissions?.comercial?.write || false
-            if (mode === "ADMIN") return permissions?.administracion?.write || false
+            if (mode === "COM") {
+                return permissions?.comercial?.write || false
+            }
+            if (mode === "ADMIN") {
+                return permissions?.administracion?.write || false
+            }
             return false
         }
     }
