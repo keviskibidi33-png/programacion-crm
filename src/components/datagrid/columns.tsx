@@ -583,8 +583,8 @@ const AutorizacionCell = React.memo(({ getValue, row: { index, original }, colum
         if (userRole === 'laboratorio_tipificador' || (userRole.includes('laboratorio') && userRole.includes('tipificador'))) return false
         // lector cannot edit anything
         if (userRole === 'laboratorio_lector' || userRole.includes('lector')) return false
-        // vendor CAN edit autorizacion
-        if (userRole === 'vendor' || userRole.includes('vendedor') || userRole.includes('asesor') || userRole.includes('comercial')) return true
+        // vendor/comercial CANNOT edit autorizacion - solo administrativo
+        if (userRole === 'vendor' || userRole.includes('vendedor') || userRole.includes('asesor') || userRole.includes('comercial')) return false
         // administrativo CAN edit autorizacion
         if (userRole === 'administrativo') return true
         return meta?.canWrite ?? false
