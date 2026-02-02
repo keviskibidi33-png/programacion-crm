@@ -38,7 +38,6 @@ export function useCurrentUser() {
 
         // Use exact match first, then fall back to heuristics
         if (roleViewMap[rNorm]) {
-            console.log('[useCurrentUser] Initial views from roleMap:', rNorm, '->', roleViewMap[rNorm])
             return roleViewMap[rNorm]
         }
 
@@ -130,8 +129,6 @@ export function useCurrentUser() {
                         const dbRoleNorm = (dbRole || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "")
                         const isSuperAdmin = dbRoleNorm === "admin" // Only exact 'admin' role
 
-                        console.log('[use-current-user] dbRole:', dbRole, '| isSuperAdmin:', isSuperAdmin, '| dbViews:', dbViews)
-
                         if (isSuperAdmin) {
                             setAllowedViews(["LAB", "COM", "ADMIN"])
                         } else if (dbViews.length > 0) {
@@ -141,7 +138,7 @@ export function useCurrentUser() {
 
                 }
             } catch (e) {
-                console.log("[Auth] Fallback - Iframe running with URL context")
+                // Fallback - Iframe running with URL context
             } finally {
                 setLoading(false)
             }
@@ -169,8 +166,6 @@ export function useCurrentUser() {
             if (rNorm === 'admin') return true
 
             // Priority 3: Granular Matrix Permissions from Database
-            console.log('[getCanWrite] mode:', mode, '| role:', rNorm, '| permissions:', permissions)
-
             if (mode === "LAB") {
                 return permissions?.laboratorio?.write || permissions?.programacion?.write || false
             }

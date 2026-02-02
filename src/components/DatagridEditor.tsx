@@ -29,43 +29,32 @@ export function DatagridEditor() {
         'laboratorio_tipificador': 'LAB'
     }
 
-    // DEBUG: Log for diagnosis
-    console.log('[DatagridEditor] modeParam:', modeParam, '| roleParam:', roleParam)
-
     const [viewMode, setViewMode] = React.useState<"LAB" | "COM" | "ADMIN">(() => {
         // First priority: explicit mode in URL
         if (modeParam === 'comercial' || modeParam === 'com') {
-            console.log('[DatagridEditor] Mode from URL: COM')
             return 'COM'
         }
         if (modeParam === 'admin') {
-            console.log('[DatagridEditor] Mode from URL: ADMIN')
             return 'ADMIN'
         }
         if (modeParam === 'lab' || modeParam === 'laboratorio') {
-            console.log('[DatagridEditor] Mode from URL: LAB')
             return 'LAB'
         }
 
         // Fallback: detect from role parameter using exact match
         const rNorm = roleParam.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-        console.log('[DatagridEditor] rNorm from URL role:', rNorm)
 
         if (roleToViewMap[rNorm]) {
-            console.log('[DatagridEditor] Exact role match:', rNorm, '->', roleToViewMap[rNorm])
             return roleToViewMap[rNorm]
         }
 
         // Pattern matching fallback
         if (rNorm.includes('admin') || rNorm.includes('geren') || rNorm.includes('direc') || rNorm.includes('jefe')) {
-            console.log('[DatagridEditor] Pattern match (admin):', rNorm)
             return 'ADMIN'
         }
         if (rNorm.includes('comercial') || rNorm.includes('vendedor') || rNorm.includes('asesor') || rNorm.includes('vendor') || rNorm.includes('ventas')) {
-            console.log('[DatagridEditor] Pattern match (comercial):', rNorm)
             return 'COM'
         }
-        console.log('[DatagridEditor] Default to LAB')
         return 'LAB'
     })
 
