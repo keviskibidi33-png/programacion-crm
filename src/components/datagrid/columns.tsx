@@ -32,7 +32,7 @@ const formatDateToShort = (dateStr: string | null) => {
 }
 
 // Export components for use in other column definitions
-export { EditableCell, OTCell, SmartDateCell, CotizacionCell, AutorizacionCell, PaymentStatusCell }
+export { EditableCell, OTCell, SmartDateCell, CotizacionCell, AutorizacionCell, PaymentStatusCell, StatusCell }
 
 export type EditableCellProps<TData> = {
     getValue: () => unknown
@@ -568,6 +568,41 @@ const CotizacionCell = React.memo(({ getValue, row: { index, original }, column:
 })
 CotizacionCell.displayName = "CotizacionCell"
 
+// Status Cell (Estado de trabajo) - blocks lector role
+const StatusCell = React.memo(({ getValue, row: { original }, column: { id }, table }: EditableCellProps<ProgramacionServicio>) => {
+    const value = getValue() as string
+
+    // --- Column-based permissions: lector CANNOT edit estado_trabajo ---
+    const meta = table.options.meta as any
+    const userRole = (meta?.userRole || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+
+    const getCanEditStatus = (): boolean => {
+        if (userRole === 'admin') return true
+        // lector cannot edit anything
+        if (userRole === 'laboratorio_lector' || userRole.includes('lector')) return false
+        // tipificador CAN edit estado
+        if (userRole === 'laboratorio_tipificador' || (userRole.includes('laboratorio') && userRole.includes('tipificador'))) return true
+        // vendor CAN edit estado
+        if (userRole === 'vendor' || userRole.includes('vendedor') || userRole.includes('asesor') || userRole.includes('comercial')) return true
+        // administrativo CAN edit estado
+        if (userRole === 'administrativo') return true
+        return meta?.canWrite ?? false
+    }
+    const canEdit = getCanEditStatus()
+
+    const handleChange = (newValue: string) => {
+        if (!canEdit) return
+        if (newValue !== value) table.options.meta?.updateData(original.id, id, newValue)
+    }
+
+    return (
+        <div className={cn("text-[13px] font-medium", !canEdit && "cursor-not-allowed opacity-60")}>
+            <StatusSelect value={value} onChange={handleChange} disabled={!canEdit} />
+        </div>
+    )
+})
+StatusCell.displayName = "StatusCell"
+
 // Autorizacion Cell (Dropdown)
 // Granular: Depends on permissions.administracion.write
 const AutorizacionCell = React.memo(({ getValue, row: { index, original }, column: { id }, table }: EditableCellProps<ProgramacionServicio>) => {
@@ -761,13 +796,7 @@ export const columnsLab: ColumnDef<ProgramacionServicio>[] = [
         minSize: 160,
         maxSize: 280,
         enableResizing: true,
-        cell: ({ getValue, row, column, table }) => (
-            <div className="text-[13px] font-medium">
-                <StatusSelect value={getValue() as string} onChange={(newValue) => {
-                    if (newValue !== getValue()) table.options.meta?.updateData(row.original.id, column.id, newValue)
-                }} />
-            </div>
-        ),
+        cell: StatusCell,
     },
     {
         accessorKey: "cotizacion_lab",
