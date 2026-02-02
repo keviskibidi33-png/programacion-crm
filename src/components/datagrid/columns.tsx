@@ -63,6 +63,9 @@ const EditableCell = React.memo(({ getValue, row: { index, original }, column: {
         // If global canWrite is explicitly false, block everything
         const globalCanWrite = meta?.canWrite
 
+        // DEBUG: Log to diagnose permission issues
+        console.log('[EditableCell] userRole:', userRole, '| columnId:', id, '| globalCanWrite:', globalCanWrite)
+
         // Superadmin always can write everything
         if (userRole === 'admin') return true
 
@@ -97,6 +100,7 @@ const EditableCell = React.memo(({ getValue, row: { index, original }, column: {
     }
 
     const canWrite = getCanWriteColumn()
+
 
 
     // Sync external changes
