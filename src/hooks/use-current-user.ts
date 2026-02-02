@@ -24,36 +24,48 @@ export function useCurrentUser() {
     const [needsAuth, setNeedsAuth] = useState(false)
 
     const [allowedViews, setAllowedViews] = useState<ViewMode[]>(() => {
-        // Optimistic Initialization: Start with LABORATORY + whatever the URL explicitly asks for
-        const views: ViewMode[] = ["LAB"]
-        const qMode = searchParams.get("mode")?.toUpperCase()
-        if (qMode === "COMERCIAL" || qMode === "COM") views.push("COM")
-        if (qMode === "ADMIN") views.push("ADMIN")
-
-        // Role-based heuristics for initial state (Inclusive matching)
+        // Role-based mapping for known roles (before DB load)
         const rNorm = (qRole || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-        const isHighLevel = qIsAdmin || rNorm.includes("admin") || rNorm.includes("geren") || rNorm.includes("administra") || rNorm.includes("direc") || rNorm.includes("jefe")
 
-        if (isHighLevel) {
-            if (!views.includes("COM")) views.push("COM")
-            if (!views.includes("ADMIN")) views.push("ADMIN")
+        // Map role_ids to their expected views (based on database permissions)
+        const roleViewMap: Record<string, ViewMode[]> = {
+            'admin': ['LAB', 'COM', 'ADMIN'],           // Superadmin: all views
+            'administrativo': ['ADMIN'],                 // Administrativo: only admin view
+            'vendor': ['COM'],                           // Vendor: only commercial view
+            'laboratorio_lector': ['LAB'],               // Lab reader: only lab view
+            'laboratorio_tipificador': ['LAB']           // Lab tipificador: only lab view
         }
 
-        // Remove duplicates and return
-        return Array.from(new Set(views)) as ViewMode[]
+        // Use exact match first, then fall back to heuristics
+        if (roleViewMap[rNorm]) {
+            console.log('[useCurrentUser] Initial views from roleMap:', rNorm, '->', roleViewMap[rNorm])
+            return roleViewMap[rNorm]
+        }
+
+        // Heuristic fallback for unknown roles
+        if (rNorm === 'admin' || qIsAdmin) return ['LAB', 'COM', 'ADMIN']
+        if (rNorm.includes('comercial') || rNorm.includes('vendor') || rNorm.includes('vendedor')) return ['COM']
+        if (rNorm.includes('laboratorio')) return ['LAB']
+
+        // Default: wait for DB permissions (show only the requested mode)
+        const qMode = searchParams.get("mode")?.toUpperCase()
+        if (qMode === "COMERCIAL" || qMode === "COM") return ['COM']
+        if (qMode === "ADMIN") return ['ADMIN']
+        return ['LAB']  // Ultimate fallback
     })
 
     const [permissions, setPermissions] = useState<any>(() => {
-        // Initial permissions based on URL flags until DB load completes
+        // Initial permissions: minimal until DB load completes
+        // We only grant write if qCanWrite or qIsAdmin are explicitly true
         const rNorm = (qRole || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-        const isHighLevel = qIsAdmin || rNorm.includes("admin") || rNorm.includes("geren") || rNorm.includes("administra") || rNorm.includes("direc") || rNorm.includes("jefe")
-        const dynamicCanWrite = qCanWrite || isHighLevel
+        const isSuperAdmin = rNorm === 'admin' || qIsAdmin
+        const dynamicCanWrite = qCanWrite || isSuperAdmin
 
         return {
-            laboratorio: { read: true, write: dynamicCanWrite, delete: false },
-            programacion: { read: true, write: dynamicCanWrite, delete: false },
-            comercial: { read: true, write: dynamicCanWrite, delete: false },
-            administracion: { read: true, write: dynamicCanWrite, delete: false }
+            laboratorio: { read: isSuperAdmin || rNorm.includes('laboratorio'), write: dynamicCanWrite && (isSuperAdmin || rNorm.includes('laboratorio')), delete: false },
+            programacion: { read: isSuperAdmin || rNorm.includes('laboratorio'), write: dynamicCanWrite && (isSuperAdmin || rNorm.includes('laboratorio')), delete: false },
+            comercial: { read: isSuperAdmin || rNorm.includes('comercial') || rNorm.includes('vendor') || rNorm.includes('vendedor'), write: dynamicCanWrite, delete: false },
+            administracion: { read: isSuperAdmin || rNorm === 'administrativo', write: dynamicCanWrite, delete: false }
         }
     })
 
@@ -84,19 +96,9 @@ export function useCurrentUser() {
             // 2. Sync basic identity state
             if (qRole) setRole(qRole)
 
-            // 3. Optimized view calculation based on URL Role/Admin flags & requested mode
-            const views: ViewMode[] = ["LAB"]
-            const qMode = searchParams.get("mode")?.toUpperCase()
-            if (qMode === "COMERCIAL" || qMode === "COM") views.push("COM")
-            if (qMode === "ADMIN") views.push("ADMIN")
+            // 3. NO initial view calculation - wait for DB permissions
+            // (Initial views are set by useState based on role heuristics)
 
-            const rNorm = (qRole || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-            const isHighLevel = qIsAdmin || rNorm.includes("admin") || rNorm.includes("geren") || rNorm.includes("administra") || rNorm.includes("direc") || rNorm.includes("jefe")
-            if (isHighLevel) {
-                if (!views.includes("COM")) views.push("COM")
-                if (!views.includes("ADMIN")) views.push("ADMIN")
-            }
-            setAllowedViews(Array.from(new Set(views)) as ViewMode[])
 
             // 4. Fetch Profile & Permissions Matrix
             try {
@@ -158,15 +160,17 @@ export function useCurrentUser() {
         permissions,
         getCanView: (mode: ViewMode) => allowedViews.includes(mode),
         getCanWrite: (mode: ViewMode) => {
-            // Priority 1: Instant URL Overrides (for smooth Iframe experience)
+            // Priority 1: URL explicit flags (for smooth Iframe experience)
             if (qIsAdmin) return true
             if (qCanWrite) return true
 
-            // Priority 2: Role-based Bypass (for Management)
+            // Priority 2: Superadmin bypass (only exact 'admin' role)
             const rNorm = (role || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-            if (rNorm.includes("admin") || rNorm.includes("geren") || rNorm.includes("administra") || rNorm.includes("direc") || rNorm.includes("jefe")) return true
+            if (rNorm === 'admin') return true
 
-            // Priority 3: Granular Matrix Permissions (The "Security Guard")
+            // Priority 3: Granular Matrix Permissions from Database
+            console.log('[getCanWrite] mode:', mode, '| role:', rNorm, '| permissions:', permissions)
+
             if (mode === "LAB") {
                 return permissions?.laboratorio?.write || permissions?.programacion?.write || false
             }
@@ -178,5 +182,6 @@ export function useCurrentUser() {
             }
             return false
         }
+
     }
 }
