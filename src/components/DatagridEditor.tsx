@@ -101,6 +101,12 @@ export function DatagridEditor() {
                                         Modo Consulta
                                     </span>
                                 )}
+                                {!canWrite && (
+                                    <span className="ml-2 px-2.5 py-1 text-[10px] uppercase font-bold text-amber-600 bg-amber-50 border border-amber-200 rounded-md flex items-center gap-1.5 cursor-default" title="Solo lectura para esta vista">
+                                        <Info className="w-3 h-3" />
+                                        Solo Lectura
+                                    </span>
+                                )}
                             </div>
                         </div>
 
