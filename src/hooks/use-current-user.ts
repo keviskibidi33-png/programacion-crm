@@ -118,21 +118,25 @@ export function useCurrentUser() {
                     if (dbPerms && Object.keys(dbPerms).length > 0) {
                         setPermissions(dbPerms)
 
+                        // Build allowed views strictly from database permissions
                         const dbViews: ViewMode[] = []
-                        if (dbPerms.laboratorio?.read) dbViews.push("LAB")
+                        if (dbPerms.laboratorio?.read || dbPerms.programacion?.read) dbViews.push("LAB")
                         if (dbPerms.comercial?.read) dbViews.push("COM")
                         if (dbPerms.administracion?.read) dbViews.push("ADMIN")
 
-                        // High-level overrides (Recursive fallback)
+                        // Special case: Only 'admin' (superadmin) gets all views unconditionally
                         const dbRoleNorm = (dbRole || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-                        const isHighLevelDb = qIsAdmin || dbRoleNorm.includes("admin") || dbRoleNorm.includes("geren") || dbRoleNorm.includes("administra") || dbRoleNorm.includes("direc") || dbRoleNorm.includes("jefe")
+                        const isSuperAdmin = dbRoleNorm === "admin" // Only exact 'admin' role
 
-                        if (isHighLevelDb) {
+                        console.log('[use-current-user] dbRole:', dbRole, '| isSuperAdmin:', isSuperAdmin, '| dbViews:', dbViews)
+
+                        if (isSuperAdmin) {
                             setAllowedViews(["LAB", "COM", "ADMIN"])
                         } else if (dbViews.length > 0) {
                             setAllowedViews([...new Set(dbViews)])
                         }
                     }
+
                 }
             } catch (e) {
                 console.log("[Auth] Fallback - Iframe running with URL context")
