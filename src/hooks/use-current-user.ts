@@ -5,41 +5,54 @@ import { useSearchParams } from "next/navigation"
 
 export type ViewMode = "LAB" | "COM" | "ADMIN"
 
+// Helper to read URL params synchronously during initialization
+function getUrlParam(param: string) {
+    if (typeof window === 'undefined') return null
+    const params = new URLSearchParams(window.location.search)
+    return params.get(param)
+}
+
 export function useCurrentUser() {
     const supabase = useMemo(() => createClient(), [])
     const searchParams = useSearchParams()
 
-    const [role, setRole] = useState<string | null>(null)
-    const [loading, setLoading] = useState(true)
-    const [allowedViews, setAllowedViews] = useState<ViewMode[]>([])
-    const [permissions, setPermissions] = useState<any>(null)
-    const [userId, setUserId] = useState<string | null>(null)
+    // Síncronos - Disponibles desde el primer render
+    const initialUserId = getUrlParam("userId")
+    const initialRole = getUrlParam("role")?.toLowerCase() || null
+    const initialCanWrite = getUrlParam("canWrite") === "true"
+
+    const [role, setRole] = useState<string | null>(initialRole)
+    const [loading, setLoading] = useState(!initialRole) // Si no hay rol en URL, esperamos a Supabase
+    const [userId, setUserId] = useState<string | null>(initialUserId)
+    const [allowedViews, setAllowedViews] = useState<ViewMode[]>(() => {
+        if (!initialRole) return []
+        const views: ViewMode[] = ["LAB"]
+        if (initialRole.includes("admin") || initialRole.includes("gerencia") || initialRole.includes("administra")) {
+            views.push("COM", "ADMIN")
+        }
+        return views
+    })
+    const [permissions, setPermissions] = useState<any>(() => {
+        if (!initialRole) return null
+        return {
+            laboratorio: { read: true, write: initialCanWrite, delete: false },
+            programacion: { read: true, write: initialCanWrite, delete: false },
+            comercial: { read: true, write: initialCanWrite, delete: false },
+            administracion: { read: true, write: initialCanWrite, delete: false }
+        }
+    })
 
     useEffect(() => {
-        const userIdParam = searchParams.get("userId")
-        const urlRole = searchParams.get("role")?.toLowerCase()
-        const urlCanWrite = searchParams.get("canWrite") === "true"
+        // Actualizar estados si cambian los params (aunque suelen ser estables en el iframe)
+        const currentUserId = searchParams.get("userId")
+        const currentRole = searchParams.get("role")?.toLowerCase()
+        const currentCanWrite = searchParams.get("canWrite") === "true"
 
-        setUserId(userIdParam)
-
-        // 1. Inmediatamente aplicar valores de URL como fallback (evita el badge de Solo Lectura si Supabase falla)
-        if (urlRole) {
-            setRole(urlRole)
-            const initialViews: ViewMode[] = ["LAB"]
-            if (urlRole.includes("admin") || urlRole.includes("gerencia")) {
-                initialViews.push("COM", "ADMIN")
-            }
-            setAllowedViews(initialViews)
-            setPermissions({
-                laboratorio: { read: true, write: urlCanWrite, delete: false },
-                programacion: { read: true, write: urlCanWrite, delete: false },
-                comercial: { read: true, write: urlCanWrite, delete: false },
-                administracion: { read: true, write: urlCanWrite, delete: false }
-            })
-        }
+        if (currentUserId && currentUserId !== userId) setUserId(currentUserId)
 
         async function fetchRole() {
-            if (!userIdParam) {
+            const uid = currentUserId || initialUserId
+            if (!uid) {
                 setLoading(false)
                 return
             }
@@ -48,11 +61,11 @@ export function useCurrentUser() {
                 const { data, error } = await supabase
                     .from("perfiles")
                     .select("role, role_definitions!fk_perfiles_role(permissions)")
-                    .eq("id", userIdParam)
+                    .eq("id", uid)
                     .single()
 
                 if (error || !data) {
-                    console.log("[Auth] Falló Supabase (posiblemente RLS), usando datos de URL")
+                    console.log("[Auth] Falló carga Supabase (RLS?), manteniendo datos de URL")
                     setLoading(false)
                     return
                 }
@@ -72,7 +85,7 @@ export function useCurrentUser() {
                 if (perms.comercial?.read) views.push("COM")
                 if (perms.administracion?.read) views.push("ADMIN")
 
-                if (userRole.includes("admin") || userRole.includes("gerencia")) {
+                if (userRole.includes("admin") || userRole.includes("gerencia") || userRole.includes("administra")) {
                     setAllowedViews(["LAB", "COM", "ADMIN"])
                 } else {
                     if (views.length === 0) views.push("LAB")
@@ -97,7 +110,9 @@ export function useCurrentUser() {
         canView: (mode: ViewMode) => allowedViews.includes(mode),
         getCanWrite: (mode: ViewMode) => {
             if (!role) return false
-            if (role.toLowerCase().includes("admin") || role.toLowerCase().includes("gerencia")) return true
+            // Super Admin / Gerencia / Administración siempre tienen permiso total si el rol lo indica
+            const isPowerUser = role.includes("admin") || role.includes("gerencia") || role.includes("administra")
+            if (isPowerUser) return true
 
             if (mode === "LAB") {
                 return permissions?.laboratorio?.write || permissions?.programacion?.write || false
