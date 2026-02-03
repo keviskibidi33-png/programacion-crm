@@ -65,6 +65,12 @@ export const columnsComercial: ColumnDef<ProgramacionServicio>[] = [
         cell: (props: any) => <EditableCell {...props} className="text-zinc-900 font-medium" />,
     },
     {
+        accessorKey: "cotizacion_lab",
+        header: ({ column }) => <SortableHeader column={column} title="COTIZACION" />,
+        size: 160, minSize: 140, maxSize: 300, enableResizing: true,
+        cell: CotizacionCell,
+    },
+    {
         accessorKey: "fecha_solicitud_com",
         header: ({ column }) => <SortableHeader column={column} title={`FECHA\nSOLICITUD`} />,
         size: 110, minSize: 110, maxSize: 110,
