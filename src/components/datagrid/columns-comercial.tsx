@@ -84,6 +84,8 @@ export const columnsComercial: ColumnDef<ProgramacionServicio>[] = [
         header: ({ column }) => <SortableHeader column={column} title={`FECHA\nSOLICITUD`} />,
             size: 110, minSize: 110, maxSize: 110,
                 cell: SmartDateCell,
+                    size: 110, minSize: 110, maxSize: 110,
+                        cell: SmartDateCell,
     },
 {
     accessorKey: "fecha_entrega_com",
@@ -93,8 +95,8 @@ export const columnsComercial: ColumnDef<ProgramacionServicio>[] = [
     },
 {
     accessorKey: "evidencia_solicitud_envio",
-        header: ({ column }) => <SortableHeader column={column} title={`EVIDENCIA SOLICITUD - ENVIO\n- ACEPTACION COTIZ`} />,
-            size: 250, minSize: 200, maxSize: 500, enableResizing: true,
+        header: ({ column }) => <SortableHeader column={column} title="EVIDENCIAS" />,
+            size: 110, minSize: 110, maxSize: 150, enableResizing: true,
                 cell: (props: any) => <EditableCell {...props} className="text-zinc-800 text-[12px] text-center" />,
     },
 {
@@ -126,7 +128,7 @@ export const columnsComercial: ColumnDef<ProgramacionServicio>[] = [
 {
     accessorKey: "motivo_dias_atraso_com",
         header: ({ column }) => <SortableHeader column={column} title={`MOTIVO\nDIAS ATRASO`} />,
-            size: 200, minSize: 150, maxSize: 600, enableResizing: true,
+            size: 400, minSize: 200, maxSize: 800, enableResizing: true,
                 cell: (props: any) => <EditableCell {...props} className="text-zinc-800 text-[12px]" />,
     },
 ]
