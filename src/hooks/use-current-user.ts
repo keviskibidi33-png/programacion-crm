@@ -99,13 +99,20 @@ export function useCurrentUser() {
             // (Initial views are set by useState based on role heuristics)
 
 
-            // 4. Fetch Profile & Permissions Matrix
+            // 4. Fetch Profile & Permissions Matrix (silently handle 406 errors from FK join)
             try {
-                const { data: profile } = await supabase
+                const { data: profile, error: profileError } = await supabase
                     .from("perfiles")
                     .select("role, role_definitions!fk_perfiles_role(permissions)")
                     .eq("id", currentUid)
                     .single()
+
+                // Silently ignore 406 errors (FK relation issues) - URL context is sufficient
+                if (profileError) {
+                    // Don't log - this is expected in Iframe context
+                    setLoading(false)
+                    return
+                }
 
                 if (profile) {
                     const dbRole = profile.role?.toLowerCase()

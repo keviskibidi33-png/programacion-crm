@@ -18,8 +18,8 @@ interface AuthorizationSelectProps {
 }
 
 const DEFAULT_AUTH_OPTIONS: SelectOption[] = [
-    { value: "ENTREGADO", label: "ENTREGADO", color: "bg-green-100 text-green-800 border-green-200 hover:bg-green-200" },
-    { value: "NO ENTREGADO", label: "NO ENTREGADO", color: "bg-red-50 text-red-800 border-red-100 hover:bg-red-100" },
+    { value: "ENTREGADO", label: "ENTREGAR", color: "bg-green-100 text-green-800 border-green-200 hover:bg-green-200" },
+    { value: "NO ENTREGADO", label: "NO ENTREGAR", color: "bg-red-50 text-red-800 border-red-100 hover:bg-red-100" },
 ]
 
 export function AuthorizationSelect({ value, onChange, disabled, options = DEFAULT_AUTH_OPTIONS }: AuthorizationSelectProps) {
@@ -72,7 +72,7 @@ export function AuthorizationSelect({ value, onChange, disabled, options = DEFAU
                         activeColor
                     )}
                 >
-                    {value || "-"}
+                    {activeOption?.label || value || "-"}
                 </div>
             </div>
         )
@@ -81,14 +81,14 @@ export function AuthorizationSelect({ value, onChange, disabled, options = DEFAU
     return (
         <div className="relative w-full h-full flex items-center justify-center" ref={containerRef}>
             <div
-                onClick={() => setIsOpen(!isOpen)}
+                onClick={() => !disabled && setIsOpen(!isOpen)}
                 className={cn(
                     "px-2 py-0.5 rounded border text-[10px] font-bold text-center cursor-pointer select-none truncate w-full transition-all flex items-center justify-center",
                     activeColor,
                     isOpen && "ring-2 ring-blue-400 ring-offset-1"
                 )}
             >
-                {value || "-"}
+                {activeOption?.label || value || "-"}
             </div>
 
             {isOpen && (

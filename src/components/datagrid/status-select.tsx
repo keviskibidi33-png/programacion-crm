@@ -14,7 +14,7 @@ const STATUS_OPTIONS = [
     { value: "PENDIENTE", label: "PENDIENTE", color: "bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200" },
     { value: "PROCESO", label: "PROCESO", color: "bg-amber-100 text-amber-800 border-amber-200 hover:bg-amber-200" },
     { value: "INFORME LISTO", label: "INFORME LISTO", color: "bg-blue-100 text-blue-800 border-blue-200 hover:bg-blue-200" },
-    { value: "ENTREGADO", label: "ENTREGADO", color: "bg-purple-100 text-purple-800 border-purple-200 hover:bg-purple-200" },
+    { value: "ENTREGADO", label: "ENTREGAR", color: "bg-purple-100 text-purple-800 border-purple-200 hover:bg-purple-200" },
 ]
 
 const getStatusColor = (status: string) => {

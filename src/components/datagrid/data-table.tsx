@@ -148,7 +148,7 @@ export function DataTable<TData, TValue>({
                             <option value="PENDIENTE">Pendiente</option>
                             <option value="PROCESO">En Proceso</option>
                             <option value="INFORME LISTO">Informe Listo</option>
-                            <option value="ENTREGADO">Entregado</option>
+                            <option value="ENTREGADO">Entregar</option>
                         </select>
                     )}
 
@@ -159,8 +159,8 @@ export function DataTable<TData, TValue>({
                             onChange={e => table.getColumn("autorizacion_lab")?.setFilterValue(e.target.value === "TODOS" ? "" : e.target.value)}
                         >
                             <option value="TODOS">Autorización: Todas</option>
-                            <option value="ENTREGADO">Entregado</option>
-                            <option value="NO ENTREGADO">No Entregado</option>
+                            <option value="ENTREGADO">Entregar</option>
+                            <option value="NO ENTREGADO">No Entregar</option>
                         </select>
                     )}
 
