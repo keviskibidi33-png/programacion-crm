@@ -33,6 +33,7 @@ declare module '@tanstack/react-table' {
         userRole?: string
         canWrite?: boolean
         permissions?: any
+        viewMode?: string
     }
 }
 
@@ -45,6 +46,7 @@ interface DataTableProps<TData, TValue> {
     userRole?: string
     canWrite?: boolean
     permissions?: any
+    viewMode?: string
 }
 
 export function DataTable<TData, TValue>({
@@ -55,7 +57,8 @@ export function DataTable<TData, TValue>({
     onInsert,
     userRole,
     canWrite,
-    permissions
+    permissions,
+    viewMode
 }: DataTableProps<TData, TValue>) {
     const [sorting, setSorting] = React.useState<SortingState>([])
     const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
@@ -111,7 +114,8 @@ export function DataTable<TData, TValue>({
             },
             userRole: userRole || '',
             canWrite: canWrite ?? false,
-            permissions: permissions || null
+            permissions: permissions || null,
+            viewMode: viewMode || ''
         },
     })
 

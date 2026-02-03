@@ -62,10 +62,24 @@ const EditableCell = React.memo(({ getValue, row: { index, original }, column: {
     const getCanWriteColumn = (): boolean => {
         // If global canWrite is explicitly false, block everything
         const globalCanWrite = meta?.canWrite
+        const viewMode = meta?.viewMode || ""
 
-
-        // Superadmin always can write everything
-        if (userRole === 'admin') return true
+        // Role restrictions for ADMIN: should follow the view's specific logic
+        if (userRole === 'admin') {
+            if (viewMode === 'LAB') {
+                const blockedColumns = ['cotizacion_lab', 'autorizacion_lab']
+                if (blockedColumns.includes(id)) return false
+            }
+            if (viewMode === 'COM') {
+                const blockedColumns = ['estado_pago']
+                if (blockedColumns.includes(id)) return false
+            }
+            if (viewMode === 'ADMIN') {
+                const blockedColumns = ['cotizacion_lab']
+                if (blockedColumns.includes(id)) return false
+            }
+            return true
+        }
 
         // Role: laboratorio_lector - Cannot edit anything
         if (userRole === 'laboratorio_lector' || userRole.includes('lector')) {
@@ -489,7 +503,11 @@ const CotizacionCell = React.memo(({ getValue, row: { index, original }, column:
     const userRole = (meta?.userRole || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
 
     const getCanEditCotizacion = (): boolean => {
-        if (userRole === 'admin') return true
+        const viewMode = meta?.viewMode || ""
+        if (userRole === 'admin') {
+            if (viewMode === 'LAB' || viewMode === 'ADMIN') return false
+            return true
+        }
         // tipificador cannot edit cotizacion
         if (userRole === 'laboratorio_tipificador' || (userRole.includes('laboratorio') && userRole.includes('tipificador'))) return false
         // administrativo cannot edit cotizacion
@@ -611,7 +629,11 @@ const AutorizacionCell = React.memo(({ getValue, row: { index, original }, colum
     const userRole = (meta?.userRole || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
 
     const getCanEditAutorizacion = (): boolean => {
-        if (userRole === 'admin') return true
+        const viewMode = meta?.viewMode || ""
+        if (userRole === 'admin') {
+            if (viewMode === 'LAB') return false
+            return true
+        }
         // tipificador cannot edit autorizacion
         if (userRole === 'laboratorio_tipificador' || (userRole.includes('laboratorio') && userRole.includes('tipificador'))) return false
         // lector cannot edit anything
@@ -649,7 +671,11 @@ const PaymentStatusCell = React.memo(({ getValue, row, column: { id }, table }: 
     const userRole = (meta?.userRole || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
 
     const getCanEditPayment = (): boolean => {
-        if (userRole === 'admin') return true
+        const viewMode = meta?.viewMode || ""
+        if (userRole === 'admin') {
+            if (viewMode === 'COM') return false
+            return true
+        }
         // vendor cannot edit estado_pago
         if (userRole === 'vendor' || userRole.includes('vendedor') || userRole.includes('asesor') || userRole.includes('comercial')) return false
         // lector cannot edit anything

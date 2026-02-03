@@ -219,6 +219,7 @@ export function DatagridEditor() {
                     userRole={role || ''}
                     canWrite={canWrite}
                     permissions={permissions}
+                    viewMode={viewMode}
                     key={viewMode} // Force remount on view change to reset table state
                 />
             </div>
