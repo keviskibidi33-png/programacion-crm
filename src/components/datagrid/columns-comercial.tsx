@@ -93,27 +93,23 @@ export const columnsComercial: ColumnDef<ProgramacionServicio>[] = [
         header: ({ column }) => <SortableHeader column={column} title={`DIAS ATRASO\nENVIO COTIZ.`} />,
         size: 110, minSize: 100, maxSize: 150, enableResizing: true,
         cell: ({ row }) => {
-            const estimatedDateStr = row.original.fecha_entrega_com
-            const realDateStr = row.original.entrega_real
+            const solicitudDateStr = row.original.fecha_solicitud_com
+            const entregaDateStr = row.original.fecha_entrega_com
 
-            if (!estimatedDateStr) return <div className="text-zinc-300 text-center">-</div>
+            if (!solicitudDateStr || !entregaDateStr) return <div className="text-zinc-300 text-center">-</div>
 
-            const estimated = new Date(estimatedDateStr)
-            const real = realDateStr ? new Date(realDateStr) : new Date()
+            const solicitud = new Date(solicitudDateStr)
+            const entrega = new Date(entregaDateStr)
 
-            estimated.setHours(0, 0, 0, 0)
-            real.setHours(0, 0, 0, 0)
+            solicitud.setHours(0, 0, 0, 0)
+            entrega.setHours(0, 0, 0, 0)
 
-            const diffTime = real.getTime() - estimated.getTime()
+            const diffTime = entrega.getTime() - solicitud.getTime()
             const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
 
-            if (!realDateStr && diffDays <= 0) {
-                return <div className="text-center font-mono text-zinc-900 text-sm">0</div>
-            }
-
             return (
-                <div className={`text-center font-mono text-sm ${diffDays > 0 ? "text-red-600 font-bold" : "text-zinc-900"}`}>
-                    {diffDays > 0 ? `+${diffDays}` : diffDays}
+                <div className={`text-center font-mono text-sm ${diffDays > 0 ? "text-zinc-900" : "text-zinc-900"}`}>
+                    {diffDays}
                 </div>
             )
         }
@@ -123,17 +119,5 @@ export const columnsComercial: ColumnDef<ProgramacionServicio>[] = [
         header: ({ column }) => <SortableHeader column={column} title={`MOTIVO\nDIAS ATRASO`} />,
         size: 200, minSize: 150, maxSize: 600, enableResizing: true,
         cell: (props: any) => <EditableCell {...props} className="text-zinc-800 text-[12px]" />,
-    },
-    {
-        accessorKey: "estado_pago",
-        header: ({ column }) => <SortableHeader column={column} title={`ESTADO\nPAGO`} className="text-emerald-700" />,
-        size: 130, minSize: 100, maxSize: 200, enableResizing: true,
-        cell: PaymentStatusCell,
-    },
-    {
-        accessorKey: "autorizacion_lab",
-        header: ({ column }) => <SortableHeader column={column} title="AUTORIZADO" className="bg-indigo-50/50 text-indigo-900" />,
-        size: 180, minSize: 120, maxSize: 300, enableResizing: true,
-        cell: AutorizacionCell,
     },
 ]
