@@ -6,6 +6,7 @@ import { z } from "zod"
 import { StatusSelect } from "./status-select"
 import { PaymentSelect } from "./payment-select"
 import { AuthorizationSelect } from "./authorization-select"
+import { toast } from "sonner"
 
 // Zod Schema for validation
 const insertSchema = z.object({
@@ -176,6 +177,23 @@ export function GhostRow<TData>({ table, onInsert }: GhostRowProps<TData>) {
         const validationPayload = {
             recep_numero: newData['recep_numero' as keyof TData],
             ot: newData['ot' as keyof TData]
+        }
+
+        // --- DUPLICATE CODIGO MUESTRA CHECK ---
+        const codigoMuestra = newData['codigo_muestra' as keyof TData] as string
+        if (codigoMuestra) {
+            // @ts-ignore - TData is ProgramacionServicio
+            const existingData = (table.options.data as any[]) || []
+            const isDuplicate = existingData.some(row =>
+                row.codigo_muestra?.trim().toLowerCase() === codigoMuestra.trim().toLowerCase()
+            )
+
+            if (isDuplicate) {
+                toast.error("Código de muestra duplicado", {
+                    description: `El código "${codigoMuestra}" ya está registrado en la tabla.`,
+                })
+                return
+            }
         }
 
         try {

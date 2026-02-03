@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils"
 import { StatusSelect } from "./status-select"
 import { AuthorizationSelect } from "./authorization-select"
 import { PaymentSelect } from "./payment-select"
+import { toast } from "sonner"
 
 // Extend meta to support custom cell editing
 declare module "@tanstack/react-table" {
@@ -446,6 +447,21 @@ const CodigoMuestraCell = React.memo(({ getValue, row: { original }, column: { i
     const onBlur = () => {
         setIsEditing(false)
         if (inputValue !== value) {
+            // Validation: Check if the new code already exists in the table (excluding this row)
+            const data = (table.options.data as ProgramacionServicio[]) || []
+            const isDuplicate = data.some(row =>
+                row.id !== original.id &&
+                row.codigo_muestra?.trim().toLowerCase() === inputValue.trim().toLowerCase()
+            )
+
+            if (isDuplicate && inputValue.trim() !== "") {
+                toast.error("Código de muestra duplicado", {
+                    description: `El código "${inputValue}" ya existe en otra fila.`,
+                })
+                setInputValue(value || "") // Revert local state
+                return
+            }
+
             table.options.meta?.updateData(original.id, id, inputValue)
         }
     }
