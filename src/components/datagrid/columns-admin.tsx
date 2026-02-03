@@ -88,7 +88,7 @@ export const columnsAdmin: ColumnDef<ProgramacionServicio>[] = [
     {
         accessorKey: "recep_numero",
         header: ({ column }) => <SortableHeader column={column} title="RECEP" />,
-        size: 78, minSize: 78, maxSize: 78, enablePinning: true, enableResizing: false,
+        size: 100, minSize: 100, maxSize: 100, enablePinning: true, enableResizing: false,
         cell: ({ getValue }) => <div className="text-zinc-900 font-medium px-2">{getValue() as string}</div>,
     },
     {
