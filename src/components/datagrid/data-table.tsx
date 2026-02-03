@@ -28,10 +28,12 @@ import { GhostRow } from "./ghost-row"
 
 // Extend TableMeta to include our custom properties
 declare module '@tanstack/react-table' {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     interface TableMeta<TData extends RowData> {
         updateData: (rowId: string, columnId: string, value: unknown) => void
         userRole?: string
         canWrite?: boolean
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         permissions?: any
         viewMode?: string
     }
@@ -45,6 +47,7 @@ interface DataTableProps<TData, TValue> {
     onInsert?: (data: Partial<TData>) => Promise<void>
     userRole?: string
     canWrite?: boolean
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     permissions?: any
     viewMode?: string
 }
@@ -71,6 +74,7 @@ export function DataTable<TData, TValue>({
         pageSize: 500,
     })
 
+    // eslint-disable-next-line react-hooks/incompatible-library
     const table = useReactTable({
         data,
         columns,

@@ -8,7 +8,7 @@ import { columnsLab } from "@/components/datagrid/columns"
 import { columnsComercial } from "@/components/datagrid/columns-comercial"
 import { columnsAdmin } from "@/components/datagrid/columns-admin"
 import { useProgramacionData } from "@/hooks/use-programacion-data"
-import { RefreshCw, Save, Wifi, WifiOff, FileDown, Info, Lock } from "lucide-react"
+import { RefreshCw, Wifi, WifiOff, FileDown, Info, Lock } from "lucide-react"
 import { LoginButton } from "@/components/login-button"
 import { useCurrentUser } from "@/hooks/use-current-user"
 
@@ -211,6 +211,7 @@ export function DatagridEditor() {
             {/* Main Content Area */}
             <div className="flex-1 overflow-hidden bg-zinc-50 p-1">
                 <DataTable
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
                     columns={currentColumns as any}
                     data={data}
                     loading={isLoading}

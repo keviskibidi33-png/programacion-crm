@@ -10,7 +10,7 @@ export function useProgramacionData() {
     const [realtimeStatus, setRealtimeStatus] = useState<"CONNECTING" | "SUBSCRIBED" | "CHANNEL_ERROR" | "TIMED_OUT" | "CLOSED">("CONNECTING")
 
     // 1. Fetch Inicial (Carga los 2000 registros una vez)
-    const { data: programacion = [], isLoading, error } = useQuery({
+    const { data: programacion = [], isLoading } = useQuery({
         queryKey: ["programacion"],
         queryFn: async () => {
             const { data, error } = await supabase
@@ -34,21 +34,21 @@ export function useProgramacionData() {
             .on(
                 "postgres_changes",
                 { event: "*", schema: "public", table: "programacion_lab" },
-                (payload) => {
+                (_payload) => {
                     queryClient.invalidateQueries({ queryKey: ["programacion"] })
                 }
             )
             .on(
                 "postgres_changes",
                 { event: "*", schema: "public", table: "programacion_comercial" },
-                (payload) => {
+                (_payload) => {
                     queryClient.invalidateQueries({ queryKey: ["programacion"] })
                 }
             )
             .on(
                 "postgres_changes",
                 { event: "*", schema: "public", table: "programacion_administracion" },
-                (payload) => {
+                (_payload) => {
                     queryClient.invalidateQueries({ queryKey: ["programacion"] })
                 }
             )
@@ -104,6 +104,7 @@ export function useProgramacionData() {
 
     const insertRow = useCallback(async (newRow: Partial<ProgramacionServicio>) => {
         // Prepare data for programacion_lab (base table)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const labData: any = {
             ...newRow,
             estado_trabajo: newRow.estado_trabajo || "PENDIENTE",
@@ -144,12 +145,14 @@ export function useProgramacionData() {
             const rowId = insertedData.id
 
             // Check if we need to update extension tables
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const commercialData: any = {}
             if (newRow.fecha_solicitud_com) commercialData.fecha_solicitud_com = newRow.fecha_solicitud_com
             if (newRow.fecha_entrega_com) commercialData.fecha_entrega_com = newRow.fecha_entrega_com
             if (newRow.evidencia_solicitud_envio) commercialData.evidencia_solicitud_envio = newRow.evidencia_solicitud_envio
             if (newRow.motivo_dias_atraso_com) commercialData.motivo_dias_atraso_com = newRow.motivo_dias_atraso_com
 
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const adminData: any = {}
             if (newRow.numero_factura) adminData.numero_factura = newRow.numero_factura
             if (newRow.estado_pago) adminData.estado_pago = newRow.estado_pago

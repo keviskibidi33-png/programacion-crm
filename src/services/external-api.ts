@@ -1,4 +1,4 @@
-import { ProgramacionServicio } from "@/types/programacion"
+
 
 const API_BASE_URL = "https://api.geofal.com.pe/v1"
 

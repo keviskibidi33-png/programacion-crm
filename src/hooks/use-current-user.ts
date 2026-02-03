@@ -53,6 +53,7 @@ export function useCurrentUser() {
         return ['LAB']  // Ultimate fallback
     })
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [permissions, setPermissions] = useState<any>(() => {
         // Initial permissions: minimal until DB load completes
         // We only grant write if qCanWrite or qIsAdmin are explicitly true
@@ -74,7 +75,7 @@ export function useCurrentUser() {
 
             // 1. Get User ID (either from URL or Supabase Session)
             let currentUid = qUserId
-            let sourceOfTruthIsUrl = !!qUserId
+            const sourceOfTruthIsUrl = !!qUserId
 
             if (!currentUid) {
                 const { data: { session } } = await supabase.auth.getSession()
@@ -118,8 +119,11 @@ export function useCurrentUser() {
                     const dbRole = profile.role?.toLowerCase()
                     if (!sourceOfTruthIsUrl) setRole(dbRole)
 
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
                     const roleDef = Array.isArray((profile as any).role_definitions)
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
                         ? (profile as any).role_definitions[0]
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
                         : (profile as any).role_definitions
 
                     const dbPerms = roleDef?.permissions
@@ -144,7 +148,7 @@ export function useCurrentUser() {
                     }
 
                 }
-            } catch (e) {
+            } catch (_) {
                 // Fallback - Iframe running with URL context
             } finally {
                 setLoading(false)

@@ -10,8 +10,6 @@ import { cn } from "@/lib/utils"
 // Import shared smart cells from the main columns file
 import {
     EditableCell,
-    OTCell,
-    SmartDateCell,
     CotizacionCell,
     AutorizacionCell,
     PaymentStatusCell
@@ -30,12 +28,14 @@ const SortableHeader = ({ column, title, className }: { column: Column<Programac
 }
 
 // Admin Specific: Facturacion Cell
-const FacturacionCell = React.memo(({ getValue, row: { index, original }, column: { id }, table }: any) => {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const FacturacionCell = React.memo(({ getValue, row: { original }, column: { id }, table }: any) => {
     const value = getValue() as string
     const [isEditing, setIsEditing] = React.useState(false)
     const [inputValue, setInputValue] = React.useState(value || "")
 
     // Permission: depends on permissions.administracion.write
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const meta = table.options.meta as any
     const canWrite = meta?.canWrite || meta?.permissions?.administracion?.write || false
 
@@ -105,6 +105,7 @@ export const columnsAdmin: ColumnDef<ProgramacionServicio>[] = [
         accessorKey: "proyecto",
         header: ({ column }) => <SortableHeader column={column} title="PROYECTO" />,
         size: 150, minSize: 100, maxSize: 400, enableResizing: true,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         cell: (props: any) => <EditableCell {...props} className="text-zinc-900" />,
     },
     {
@@ -135,6 +136,7 @@ export const columnsAdmin: ColumnDef<ProgramacionServicio>[] = [
         accessorKey: "nota_admin",
         header: ({ column }) => <SortableHeader column={column} title="NOTA ADMIN" />,
         size: 250, minSize: 150, maxSize: 600, enableResizing: true,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         cell: (props: any) => <EditableCell {...props} />,
     }
 ]

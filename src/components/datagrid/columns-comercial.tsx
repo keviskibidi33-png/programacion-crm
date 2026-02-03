@@ -10,11 +10,8 @@ import { cn } from "@/lib/utils"
 // Import shared smart cells from the main columns file
 import {
     EditableCell,
-    OTCell,
     SmartDateCell,
-    CotizacionCell,
-    AutorizacionCell,
-    PaymentStatusCell
+    CotizacionCell
 } from "./columns"
 
 const SortableHeader = ({ column, title, className }: { column: Column<ProgramacionServicio, unknown>, title: string, className?: string }) => {
@@ -90,6 +87,7 @@ export const columnsComercial: ColumnDef<ProgramacionServicio>[] = [
         accessorKey: "evidencia_solicitud_envio",
         header: ({ column }) => <SortableHeader column={column} title="EVIDENCIAS" />,
         size: 110, minSize: 110, maxSize: 150, enableResizing: true,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         cell: (props: any) => <EditableCell {...props} className="text-zinc-800 text-[12px] text-center" />,
     },
     {
@@ -122,6 +120,7 @@ export const columnsComercial: ColumnDef<ProgramacionServicio>[] = [
         accessorKey: "motivo_dias_atraso_com",
         header: ({ column }) => <SortableHeader column={column} title={`MOTIVO\nDIAS ATRASO`} />,
         size: 400, minSize: 200, maxSize: 800, enableResizing: true,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         cell: (props: any) => <EditableCell {...props} className="text-zinc-800 text-[12px]" />,
     },
 ]

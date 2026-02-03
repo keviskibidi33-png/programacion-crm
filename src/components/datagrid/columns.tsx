@@ -11,6 +11,7 @@ import { PaymentSelect } from "./payment-select"
 
 // Extend meta to support custom cell editing
 declare module "@tanstack/react-table" {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     interface TableMeta<TData extends RowData> {
         updateData: (rowId: string, columnId: string, value: unknown) => void
     }
@@ -43,12 +44,12 @@ export type EditableCellProps<TData> = {
 }
 
 // Editable Cell Component
-const EditableCell = React.memo(({ getValue, row: { index, original }, column: { id }, table, className }: EditableCellProps<ProgramacionServicio>) => {
+const EditableCell = React.memo(({ getValue, row: { original }, column: { id }, table, className }: EditableCellProps<ProgramacionServicio>) => {
     const initialValue = getValue()
     const [value, setValue] = React.useState(initialValue)
-    const [isFocused, setIsFocused] = React.useState(false)
 
     // --- Column-Based Permissions by Role ---
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const meta = table.options.meta as any
     const userRole = (meta?.userRole || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
 
@@ -75,7 +76,7 @@ const EditableCell = React.memo(({ getValue, row: { index, original }, column: {
                 if (blockedColumns.includes(id)) return false
             }
             if (viewMode === 'ADMIN') {
-                const blockedColumns = ['cotizacion_lab']
+                const blockedColumns = ['cotizacion_lab', 'cliente_nombre', 'proyecto']
                 if (blockedColumns.includes(id)) return false
             }
             return true
@@ -102,7 +103,7 @@ const EditableCell = React.memo(({ getValue, row: { index, original }, column: {
 
         // Role: administrativo - Can edit everything EXCEPT cotizacion_lab
         if (userRole === 'administrativo') {
-            const blockedColumns = ['cotizacion_lab']
+            const blockedColumns = ['cotizacion_lab', 'cliente_nombre', 'proyecto']
             if (blockedColumns.includes(id)) return false
             return true
         }
@@ -121,7 +122,6 @@ const EditableCell = React.memo(({ getValue, row: { index, original }, column: {
     }, [initialValue])
 
     const onBlur = () => {
-        setIsFocused(false)
         if (value !== initialValue) {
             table.options.meta?.updateData(original.id, id, value)
         }
@@ -169,7 +169,6 @@ const EditableCell = React.memo(({ getValue, row: { index, original }, column: {
                 onChange={e => setValue(e.target.value)}
                 onBlur={onBlur}
                 onKeyDown={onKeyDown}
-                onFocus={() => setIsFocused(true)}
                 className={cn(
                     "w-full bg-transparent border-none focus:outline-none focus:ring-1 focus:ring-blue-500 rounded px-1 -mx-1 h-full placeholder:text-zinc-400",
                     colorClass,
@@ -186,7 +185,6 @@ const EditableCell = React.memo(({ getValue, row: { index, original }, column: {
             onChange={e => setValue(e.target.value)}
             onBlur={onBlur}
             onKeyDown={onKeyDown}
-            onFocus={() => setIsFocused(true)}
             rows={1}
             style={{
                 fieldSizing: "content",
@@ -205,7 +203,7 @@ const EditableCell = React.memo(({ getValue, row: { index, original }, column: {
 EditableCell.displayName = "EditableCell"
 
 // OT Cell (Auto-adds -26 when user enters just digits)
-const OTCell = React.memo(({ getValue, row: { index, original }, column: { id }, table }: EditableCellProps<ProgramacionServicio>) => {
+const OTCell = React.memo(({ getValue, row: { original }, column: { id }, table }: EditableCellProps<ProgramacionServicio>) => {
     const rawValue = getValue() as string
     const cleanValue = (val: string) => val ? val.replace(/LEM/i, '').replace(/-26$/, '').trim() : ""
     const [value, setValue] = React.useState(cleanValue(rawValue))
@@ -215,6 +213,7 @@ const OTCell = React.memo(({ getValue, row: { index, original }, column: { id },
     }, [rawValue])
 
     // Permission check - Column-based restrictions by role
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const meta = table.options.meta as any
     const userRole = (meta?.userRole || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
 
@@ -279,7 +278,7 @@ const OTCell = React.memo(({ getValue, row: { index, original }, column: { id },
 OTCell.displayName = "OTCell"
 
 // Smart Date Cell (DD/MM -> YYYY-MM-DD)
-const SmartDateCell = React.memo(({ getValue, row: { index, original }, column: { id }, table }: EditableCellProps<ProgramacionServicio>) => {
+const SmartDateCell = React.memo(({ getValue, row: { original }, column: { id }, table }: EditableCellProps<ProgramacionServicio>) => {
     const rawValue = getValue() as string
     const formatDisplay = (val: string) => {
         if (!val) return ""
@@ -297,6 +296,7 @@ const SmartDateCell = React.memo(({ getValue, row: { index, original }, column: 
     const [isEditing, setIsEditing] = React.useState(false)
 
     // Permission check - Column-based restrictions by role
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const meta = table.options.meta as any
     const userRole = (meta?.userRole || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
 
@@ -320,7 +320,7 @@ const SmartDateCell = React.memo(({ getValue, row: { index, original }, column: 
             return
         }
         setIsEditing(false)
-        let finalVal = inputValue.trim()
+        const finalVal = inputValue.trim()
         let valToParse = finalVal
         if (/^\d{3}$/.test(valToParse)) valToParse = "0" + valToParse
         const shortDateRegex = /^(\d{1,2})[./探](\d{1,2})$/
@@ -423,12 +423,13 @@ const DateDisplayCell = React.memo(({ getValue, row, column, table, className }:
 DateDisplayCell.displayName = "DateDisplayCell"
 
 // Codigo Muestra Cell (Wraps text, multi-line display)
-const CodigoMuestraCell = React.memo(({ getValue, row: { index, original }, column: { id }, table }: EditableCellProps<ProgramacionServicio>) => {
+const CodigoMuestraCell = React.memo(({ getValue, row: { original }, column: { id }, table }: EditableCellProps<ProgramacionServicio>) => {
     const value = getValue() as string
     const [isEditing, setIsEditing] = React.useState(false)
     const [inputValue, setInputValue] = React.useState(value || "")
 
     // Permission check - Column-based restrictions by role
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const meta = table.options.meta as any
     const userRole = (meta?.userRole || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
 
@@ -493,12 +494,13 @@ const SortableHeader = ({ column, title, className }: { column: Column<Programac
 
 // Cotizacion Cell (Auto-formats number to COTIZ.N-XXX-26)
 // Granular: Depends on permissions.comercial.write
-const CotizacionCell = React.memo(({ getValue, row: { index, original }, column: { id }, table }: EditableCellProps<ProgramacionServicio>) => {
+const CotizacionCell = React.memo(({ getValue, row: { original }, column: { id }, table }: EditableCellProps<ProgramacionServicio>) => {
     const value = getValue() as string
     const [isEditing, setIsEditing] = React.useState(false)
     const [inputValue, setInputValue] = React.useState(value || "")
 
     // --- Column-based permissions: tipificador and administrativo CANNOT edit cotizacion_lab ---
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const meta = table.options.meta as any
     const userRole = (meta?.userRole || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
 
@@ -589,6 +591,7 @@ const StatusCell = React.memo(({ getValue, row: { original }, column: { id }, ta
     const value = getValue() as string
 
     // --- Column-based permissions: lector CANNOT edit estado_trabajo ---
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const meta = table.options.meta as any
     const userRole = (meta?.userRole || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
 
@@ -621,10 +624,11 @@ StatusCell.displayName = "StatusCell"
 
 // Autorizacion Cell (Dropdown)
 // Granular: Depends on permissions.administracion.write
-const AutorizacionCell = React.memo(({ getValue, row: { index, original }, column: { id }, table }: EditableCellProps<ProgramacionServicio>) => {
+const AutorizacionCell = React.memo(({ getValue, row: { original }, column: { id }, table }: EditableCellProps<ProgramacionServicio>) => {
     const value = getValue() as string
 
     // --- Column-based permissions: tipificador CANNOT edit autorizacion_lab ---
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const meta = table.options.meta as any
     const userRole = (meta?.userRole || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
 
@@ -667,6 +671,7 @@ const PaymentStatusCell = React.memo(({ getValue, row, column: { id }, table }: 
     const value = getValue() as string
 
     // --- Column-based permissions: vendor CANNOT edit estado_pago ---
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const meta = table.options.meta as any
     const userRole = (meta?.userRole || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
 
@@ -690,7 +695,7 @@ const PaymentStatusCell = React.memo(({ getValue, row, column: { id }, table }: 
 
     const onStatusChange = (newValue: string) => {
         if (!canEdit) return
-        table.options.meta?.updateData((row.original as any).id, id, newValue)
+        table.options.meta?.updateData(row.original.id, id, newValue)
     }
     return (
         <div className={cn("w-full h-full flex items-center justify-center p-1", !canEdit && "cursor-not-allowed")}>

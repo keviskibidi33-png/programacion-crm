@@ -1,7 +1,7 @@
 import React from "react"
 import { Table as TanStackTable } from "@tanstack/react-table"
 import { cn } from "@/lib/utils"
-import { ProgramacionServicio } from "@/types/programacion"
+
 import { z } from "zod"
 import { StatusSelect } from "./status-select"
 import { PaymentSelect } from "./payment-select"
@@ -117,7 +117,7 @@ export function GhostRow<TData>({ table, onInsert }: GhostRowProps<TData>) {
                 } else if (parts.length === 3) {
                     day = parts[0]
                     month = parts[1]
-                    let y = parts[2]
+                    const y = parts[2]
                     if (y.length === 2) {
                         yearShort = y; yearFull = `20${y}`
                     } else {
@@ -297,7 +297,7 @@ export function GhostRow<TData>({ table, onInsert }: GhostRowProps<TData>) {
 
     return (
         <tr className="group hover:bg-blue-100/50 transition-colors">
-            {table.getAllLeafColumns().map((column, colIndex) => {
+            {table.getAllLeafColumns().map((column) => {
                 const isPinned = column.getIsPinned()
                 const isLastPinned = isPinned === "left" && column.id === "descripcion_servicio"
                 const colId = column.id
@@ -310,7 +310,6 @@ export function GhostRow<TData>({ table, onInsert }: GhostRowProps<TData>) {
                 const isStatus = colId === 'estado_trabajo'
                 const isPaymentStatus = colId === 'estado_pago'
                 const isAutorizacion = colId === 'autorizacion_lab'
-                const isDate = colId.includes('fecha') || colId === 'entrega_real'
 
                 // Check permissions for this column
                 const canWrite = getCanWriteColumn(colId)
