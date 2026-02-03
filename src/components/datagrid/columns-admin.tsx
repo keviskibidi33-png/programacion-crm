@@ -96,9 +96,7 @@ export const columnsAdmin: ColumnDef<ProgramacionServicio>[] = [
         header: ({ column }) => <SortableHeader column={column} title="CLIENTE" />,
         size: 200, minSize: 150, maxSize: 400, enableResizing: true,
         cell: ({ getValue, row, column, table }) => (
-            <div className="line-clamp-2 whitespace-normal break-words leading-tight text-[12.5px]" title={getValue() as string}>
-                <EditableCell getValue={getValue} row={row} column={column} table={table} className="text-[12.5px] leading-3" />
-            </div>
+            <EditableCell getValue={getValue} row={row} column={column} table={table} className="text-[12.5px] leading-tight break-words" />
         )
     },
     {
@@ -107,11 +105,7 @@ export const columnsAdmin: ColumnDef<ProgramacionServicio>[] = [
         size: 150, minSize: 100, maxSize: 400, enableResizing: true,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        cell: (props: any) => (
-            <div className="line-clamp-2 whitespace-normal break-words leading-tight" title={props.getValue() as string}>
-                <EditableCell {...props} className="text-zinc-900" />
-            </div>
-        ),
+        cell: (props: any) => <EditableCell {...props} className="text-zinc-900 break-words" />,
     },
     {
         accessorKey: "cotizacion_lab",
@@ -143,10 +137,6 @@ export const columnsAdmin: ColumnDef<ProgramacionServicio>[] = [
         size: 250, minSize: 150, maxSize: 600, enableResizing: true,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        cell: (props: any) => (
-            <div className="line-clamp-3 whitespace-normal break-words leading-tight text-xs" title={props.getValue() as string}>
-                <EditableCell {...props} />
-            </div>
-        ),
+        cell: (props: any) => <EditableCell {...props} className="text-xs break-words" />,
     }
 ]
