@@ -142,6 +142,21 @@ export function DataTable<TData, TValue>({
                         className="h-8 w-[200px] lg:w-[250px] border border-zinc-200 rounded-md px-3 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 bg-zinc-50 text-zinc-900 placeholder:text-zinc-400"
                     />
 
+                    {/* Filter for Fecha de Entrega (Lab or Comercial) */}
+                    {(table.getAllColumns().find(c => c.id === "fecha_entrega_estimada") || table.getAllColumns().find(c => c.id === "fecha_entrega_com")) && (
+                        <input
+                            type="date"
+                            className="h-8 border border-zinc-200 rounded-md px-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white text-zinc-900 cursor-pointer hover:bg-zinc-50"
+                            onChange={e => {
+                                const val = e.target.value
+                                // Try to filter both potential date columns if they exist
+                                table.getColumn("fecha_entrega_estimada")?.setFilterValue(val)
+                                table.getColumn("fecha_entrega_com")?.setFilterValue(val)
+                            }}
+                            title="Filtrar por Fecha de Entrega"
+                        />
+                    )}
+
                     {/* Status Filter */}
                     {table.getAllColumns().find(c => c.id === "estado_trabajo") && (
                         <select

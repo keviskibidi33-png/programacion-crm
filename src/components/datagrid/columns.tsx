@@ -845,12 +845,7 @@ export const columnsLab: ColumnDef<ProgramacionServicio>[] = [
         enableResizing: true,
         cell: AutorizacionCell,
     },
-    {
-        accessorKey: "estado_pago",
-        header: ({ column }) => <SortableHeader column={column} title={`ESTADO\nPAGO`} className="text-emerald-700" />,
-        size: 130, minSize: 100, maxSize: 200, enableResizing: true,
-        cell: PaymentStatusCell,
-    },
+
     {
         accessorKey: "nota_admin",
         header: ({ column }) => <SortableHeader column={column} title="NOTA" className="text-base font-semibold" />,
