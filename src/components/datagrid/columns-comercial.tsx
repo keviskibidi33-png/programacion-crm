@@ -54,7 +54,7 @@ export const columnsComercial: ColumnDef<ProgramacionServicio>[] = [
         header: ({ column }) => <SortableHeader column={column} title="CLIENTE" />,
         size: 200, minSize: 150, maxSize: 400, enableResizing: true,
         cell: ({ getValue }) => (
-            <div className="line-clamp-2 whitespace-normal leading-tight text-[12px] font-bold text-zinc-900 uppercase" title={getValue() as string}>
+            <div className="line-clamp-2 whitespace-normal break-words leading-tight text-[12px] font-bold text-zinc-900 uppercase" title={getValue() as string}>
                 {getValue() as string}
             </div>
         )
@@ -63,7 +63,7 @@ export const columnsComercial: ColumnDef<ProgramacionServicio>[] = [
         accessorKey: "proyecto",
         header: ({ column }) => <SortableHeader column={column} title="PROYECTO" />,
         size: 200, minSize: 150, maxSize: 500, enableResizing: true,
-        cell: ({ getValue }) => <div className="text-zinc-900 font-medium whitespace-normal leading-tight">{getValue() as string}</div>,
+        cell: ({ getValue }) => <div className="text-zinc-900 font-medium whitespace-normal break-words leading-tight line-clamp-3 overflow-hidden text-ellipsis max-w-full" title={getValue() as string}>{getValue() as string}</div>,
     },
     {
         accessorKey: "cotizacion_lab",
@@ -121,6 +121,6 @@ export const columnsComercial: ColumnDef<ProgramacionServicio>[] = [
         header: ({ column }) => <SortableHeader column={column} title={`MOTIVO\nDIAS ATRASO`} />,
         size: 400, minSize: 200, maxSize: 800, enableResizing: true,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        cell: (props: any) => <EditableCell {...props} className="text-zinc-800 text-[12px]" />,
+        cell: (props: any) => <EditableCell {...props} className="text-zinc-800 text-[12px] whitespace-normal break-words line-clamp-2" />,
     },
 ]
