@@ -12,7 +12,7 @@ import {
     EditableCell,
     CotizacionCell,
     AutorizacionCell,
-
+    PaymentStatusCell
 } from "./columns"
 
 const SortableHeader = ({ column, title, className }: { column: Column<ProgramacionServicio, unknown>, title: string, className?: string }) => {
@@ -120,7 +120,12 @@ export const columnsAdmin: ColumnDef<ProgramacionServicio>[] = [
         size: 160, minSize: 120, maxSize: 250, enableResizing: true,
         cell: FacturacionCell,
     },
-
+    {
+        accessorKey: "estado_pago",
+        header: ({ column }) => <SortableHeader column={column} title="ESTADO PAGO" className="text-emerald-700" />,
+        size: 130, minSize: 100, maxSize: 200, enableResizing: true,
+        cell: PaymentStatusCell,
+    },
     {
         accessorKey: "autorizacion_lab",
         header: ({ column }) => <SortableHeader column={column} title="AUTORIZADO" className="bg-indigo-50/50 text-indigo-900" />,

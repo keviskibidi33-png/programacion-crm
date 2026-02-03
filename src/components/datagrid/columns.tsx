@@ -7,7 +7,7 @@ import { ArrowUpDown } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { StatusSelect } from "./status-select"
 import { AuthorizationSelect } from "./authorization-select"
-
+import { PaymentSelect } from "./payment-select"
 
 // Extend meta to support custom cell editing
 declare module "@tanstack/react-table" {
@@ -33,7 +33,7 @@ const formatDateToShort = (dateStr: string | null) => {
 }
 
 // Export components for use in other column definitions
-export { EditableCell, OTCell, SmartDateCell, CotizacionCell, AutorizacionCell, StatusCell }
+export { EditableCell, OTCell, SmartDateCell, CotizacionCell, AutorizacionCell, PaymentStatusCell, StatusCell }
 
 export type EditableCellProps<TData> = {
     getValue: () => unknown
@@ -667,7 +667,43 @@ const AutorizacionCell = React.memo(({ getValue, row: { original }, column: { id
 })
 AutorizacionCell.displayName = "AutorizacionCell"
 
+const PaymentStatusCell = React.memo(({ getValue, row, column: { id }, table }: EditableCellProps<ProgramacionServicio>) => {
+    const value = getValue() as string
 
+    // --- Column-based permissions: vendor CANNOT edit estado_pago ---
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const meta = table.options.meta as any
+    const userRole = (meta?.userRole || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+
+    const getCanEditPayment = (): boolean => {
+        const viewMode = meta?.viewMode || ""
+        if (userRole === 'admin') {
+            if (viewMode === 'COM') return false
+            return true
+        }
+        // vendor cannot edit estado_pago
+        if (userRole === 'vendor' || userRole.includes('vendedor') || userRole.includes('asesor') || userRole.includes('comercial')) return false
+        // lector cannot edit anything
+        if (userRole === 'laboratorio_lector' || userRole.includes('lector')) return false
+        // tipificador CAN edit estado_pago
+        if (userRole === 'laboratorio_tipificador' || (userRole.includes('laboratorio') && userRole.includes('tipificador'))) return true
+        // administrativo CAN edit estado_pago
+        if (userRole === 'administrativo') return true
+        return meta?.canWrite ?? false
+    }
+    const canEdit = getCanEditPayment()
+
+    const onStatusChange = (newValue: string) => {
+        if (!canEdit) return
+        table.options.meta?.updateData(row.original.id, id, newValue)
+    }
+    return (
+        <div className={cn("w-full h-full flex items-center justify-center p-1", !canEdit && "cursor-not-allowed")}>
+            <PaymentSelect value={value} onChange={onStatusChange} disabled={!canEdit} />
+        </div>
+    )
+})
+PaymentStatusCell.displayName = "PaymentStatusCell"
 
 export const columnsLab: ColumnDef<ProgramacionServicio>[] = [
     {
