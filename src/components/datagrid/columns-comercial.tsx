@@ -42,93 +42,86 @@ export const columnsComercial: ColumnDef<ProgramacionServicio>[] = [
         size: 85, minSize: 85, maxSize: 85, enablePinning: true, enableResizing: false,
         cell: ({ getValue }) => <div className="text-zinc-900 font-bold px-2 text-center">{getValue() as string}</div>,
     },
-    },
-{
-    accessorKey: "fecha_recepcion",
+    {
+        accessorKey: "fecha_recepcion",
         header: ({ column }) => <SortableHeader column={column} title={`FECHA\nRECEPCIÓN`} />,
-            size: 110, minSize: 110, maxSize: 110,
-                cell: ({ getValue }) => {
-                    const dateStr = getValue() as string
-                    if (!dateStr) return <div className="text-zinc-300 text-center">-</div>
-                    const date = new Date(dateStr)
-                    date.setDate(date.getDate() + 1) // Fix timezone offset usually handled by SmartDateCell logic or just display raw if DD/MM/YYYY is needed
-                    // Actually, SmartDateCell handles display. Let's just do a simple valid display for consistency or reuse a ReadOnly date component.
-                    // Using simple string split if it's YYYY-MM-DD or simple Date format.
-                    return <div className="text-zinc-700 text-center text-sm">{dateStr.split('-').reverse().join('/')}</div>
-                }
-},
-{
-    accessorKey: "cliente_nombre",
+        size: 110, minSize: 110, maxSize: 110,
+        cell: ({ getValue }) => {
+            const dateStr = getValue() as string
+            if (!dateStr) return <div className="text-zinc-300 text-center">-</div>
+            return <div className="text-zinc-900 text-center text-sm font-medium">{dateStr.split('-').reverse().join('/')}</div>
+        }
+    },
+    {
+        accessorKey: "cliente_nombre",
         header: ({ column }) => <SortableHeader column={column} title="CLIENTE" />,
-            size: 200, minSize: 150, maxSize: 400, enableResizing: true,
-                cell: ({ getValue }) => (
-                    <div className="line-clamp-2 whitespace-normal leading-tight text-[12px] font-bold text-zinc-700 uppercase" title={getValue() as string}>
-                        {getValue() as string}
-                    </div>
-                )
-},
-{
-    accessorKey: "proyecto",
+        size: 200, minSize: 150, maxSize: 400, enableResizing: true,
+        cell: ({ getValue }) => (
+            <div className="line-clamp-2 whitespace-normal leading-tight text-[12px] font-bold text-zinc-900 uppercase" title={getValue() as string}>
+                {getValue() as string}
+            </div>
+        )
+    },
+    {
+        accessorKey: "proyecto",
         header: ({ column }) => <SortableHeader column={column} title="PROYECTO" />,
-            size: 200, minSize: 150, maxSize: 500, enableResizing: true,
-                cell: ({ getValue }) => <div className="text-zinc-900 font-medium whitespace-normal leading-tight">{getValue() as string}</div>,
+        size: 200, minSize: 150, maxSize: 500, enableResizing: true,
+        cell: ({ getValue }) => <div className="text-zinc-900 font-medium whitespace-normal leading-tight">{getValue() as string}</div>,
     },
-{
-    accessorKey: "cotizacion_lab",
+    {
+        accessorKey: "cotizacion_lab",
         header: ({ column }) => <SortableHeader column={column} title="COTIZACION" />,
-            size: 160, minSize: 140, maxSize: 300, enableResizing: true,
-                cell: CotizacionCell,
+        size: 160, minSize: 140, maxSize: 300, enableResizing: true,
+        cell: CotizacionCell,
     },
-{
-    accessorKey: "fecha_solicitud_com",
+    {
+        accessorKey: "fecha_solicitud_com",
         header: ({ column }) => <SortableHeader column={column} title={`FECHA\nSOLICITUD`} />,
-            size: 110, minSize: 110, maxSize: 110,
-                cell: SmartDateCell,
-                    size: 110, minSize: 110, maxSize: 110,
-                        cell: SmartDateCell,
+        size: 110, minSize: 110, maxSize: 110,
+        cell: SmartDateCell,
     },
-{
-    accessorKey: "fecha_entrega_com",
+    {
+        accessorKey: "fecha_entrega_com",
         header: ({ column }) => <SortableHeader column={column} title={`FECHA\nENTREGA`} />,
-            size: 110, minSize: 110, maxSize: 110,
-                cell: SmartDateCell,
+        size: 110, minSize: 110, maxSize: 110,
+        cell: SmartDateCell,
     },
-{
-    accessorKey: "evidencia_solicitud_envio",
+    {
+        accessorKey: "evidencia_solicitud_envio",
         header: ({ column }) => <SortableHeader column={column} title="EVIDENCIAS" />,
-            size: 110, minSize: 110, maxSize: 150, enableResizing: true,
-                cell: (props: any) => <EditableCell {...props} className="text-zinc-800 text-[12px] text-center" />,
+        size: 110, minSize: 110, maxSize: 150, enableResizing: true,
+        cell: (props: any) => <EditableCell {...props} className="text-zinc-800 text-[12px] text-center" />,
     },
-{
-    accessorKey: "dias_atraso_envio_coti",
+    {
+        accessorKey: "dias_atraso_envio_coti",
         header: ({ column }) => <SortableHeader column={column} title={`DIAS ATRASO\nENVIO COTIZ.`} />,
-            size: 110, minSize: 100, maxSize: 150, enableResizing: true,
-                cell: ({ row }) => {
-                    const solicitudDateStr = row.original.fecha_solicitud_com
-                    const entregaDateStr = row.original.fecha_entrega_com
+        size: 110, minSize: 100, maxSize: 150, enableResizing: true,
+        cell: ({ row }) => {
+            const solicitudDateStr = row.original.fecha_solicitud_com
+            const entregaDateStr = row.original.fecha_entrega_com
 
-                    if (!solicitudDateStr || !entregaDateStr) return <div className="text-zinc-300 text-center">-</div>
+            if (!solicitudDateStr || !entregaDateStr) return <div className="text-zinc-300 text-center">-</div>
 
-                    const solicitud = new Date(solicitudDateStr)
-                    const entrega = new Date(entregaDateStr)
+            const solicitud = new Date(solicitudDateStr)
+            const entrega = new Date(entregaDateStr)
 
-                    solicitud.setHours(0, 0, 0, 0)
-                    entrega.setHours(0, 0, 0, 0)
+            solicitud.setHours(0, 0, 0, 0)
+            entrega.setHours(0, 0, 0, 0)
 
-                    const diffTime = entrega.getTime() - solicitud.getTime()
-                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+            const diffTime = entrega.getTime() - solicitud.getTime()
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
 
-                    return (
-                        <div className={`text-center font-mono text-sm ${diffDays > 0 ? "text-zinc-900" : "text-zinc-900"}`}>
-                            {diffDays}
-                        </div>
-                    )
-                }
-},
-{
-    accessorKey: "motivo_dias_atraso_com",
+            return (
+                <div className={`text-center font-mono text-sm ${diffDays > 0 ? "text-zinc-900" : "text-zinc-900"}`}>
+                    {diffDays}
+                </div>
+            )
+        }
+    },
+    {
+        accessorKey: "motivo_dias_atraso_com",
         header: ({ column }) => <SortableHeader column={column} title={`MOTIVO\nDIAS ATRASO`} />,
-            size: 400, minSize: 200, maxSize: 800, enableResizing: true,
-                cell: (props: any) => <EditableCell {...props} className="text-zinc-800 text-[12px]" />,
+        size: 400, minSize: 200, maxSize: 800, enableResizing: true,
+        cell: (props: any) => <EditableCell {...props} className="text-zinc-800 text-[12px]" />,
     },
 ]

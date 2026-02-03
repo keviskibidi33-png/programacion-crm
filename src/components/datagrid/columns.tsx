@@ -150,12 +150,12 @@ const EditableCell = React.memo(({ getValue, row: { index, original }, column: {
     }
 
     const isDate = id.includes('fecha') || id === 'entrega_real'
-    const colorClass = canWrite ? "text-zinc-900" : "text-zinc-500"
+    const colorClass = canWrite ? "text-zinc-900" : "text-zinc-900"
     const textSize = className?.includes('text-') ? '' : 'text-sm'
 
     if (!canWrite) {
         return (
-            <div className={cn("px-1 py-1 truncate cursor-not-allowed opacity-70 bg-zinc-50/30", colorClass, textSize, className)} title="Sin permiso de edición">
+            <div className={cn("px-1 py-1 truncate cursor-not-allowed bg-zinc-50/30 font-medium", colorClass, textSize, className)} title="Sin permiso de edición">
                 {isDate ? formatDateToShort(value as string) : (value as string || "-")}
             </div>
         )
@@ -387,7 +387,7 @@ const SmartDateCell = React.memo(({ getValue, row: { index, original }, column: 
             onClick={() => { if (canWrite) setIsEditing(true); }}
             className={cn(
                 "w-full h-full flex items-center px-1 text-zinc-900 font-medium leading-tight",
-                canWrite ? "cursor-pointer hover:bg-zinc-100/50" : "cursor-not-allowed text-zinc-400 opacity-70"
+                canWrite ? "cursor-pointer hover:bg-zinc-100/50" : "cursor-not-allowed bg-zinc-50/30"
             )}
             title={canWrite ? "Click para editar" : "Sin permiso de edición"}
         >
@@ -470,7 +470,7 @@ const CodigoMuestraCell = React.memo(({ getValue, row: { index, original }, colu
     return (
         <div
             onClick={() => { if (canWrite) { setInputValue(value || ""); setIsEditing(true); } }}
-            className={cn("w-full h-full flex items-center px-1 text-sm text-zinc-900 font-medium leading-tight break-words", canWrite ? "cursor-pointer hover:bg-slate-50" : "cursor-not-allowed opacity-70")}
+            className={cn("w-full h-full flex items-center px-1 text-sm text-zinc-900 font-medium leading-tight break-words", canWrite ? "cursor-pointer hover:bg-slate-50" : "cursor-not-allowed bg-zinc-50/30")}
             title={value || "Click para editar"}
         >
             <span className="line-clamp-3">{value || <span className="text-zinc-300 italic">...</span>}</span>
@@ -552,7 +552,7 @@ const CotizacionCell = React.memo(({ getValue, row: { index, original }, column:
 
     if (!canEdit) {
         return (
-            <div className="w-full h-full flex items-center px-1 text-sm text-zinc-500 bg-zinc-50/50 cursor-not-allowed opacity-70" title="Solo Comercial puede editar">
+            <div className="w-full h-full flex items-center px-1 text-sm text-zinc-900 font-medium bg-zinc-50/50 cursor-not-allowed" title="Solo Comercial puede editar">
                 {value || <span className="text-zinc-300 italic">-</span>}
             </div>
         )
