@@ -92,12 +92,6 @@ export const columnsAdmin: ColumnDef<ProgramacionServicio>[] = [
         cell: ({ getValue }) => <div className="text-zinc-900 font-medium px-2">{getValue() as string}</div>,
     },
     {
-        accessorKey: "ot",
-        header: ({ column }) => <SortableHeader column={column} title="OT" />,
-        size: 125, minSize: 125, maxSize: 125, enablePinning: true, enableResizing: false,
-        cell: OTCell,
-    },
-    {
         accessorKey: "cliente_nombre",
         header: ({ column }) => <SortableHeader column={column} title="CLIENTE" />,
         size: 200, minSize: 150, maxSize: 400, enableResizing: true,
@@ -111,12 +105,6 @@ export const columnsAdmin: ColumnDef<ProgramacionServicio>[] = [
         accessorKey: "proyecto",
         header: ({ column }) => <SortableHeader column={column} title="PROYECTO" />,
         size: 150, minSize: 100, maxSize: 400, enableResizing: true,
-        cell: (props: any) => <EditableCell {...props} className="text-zinc-900" />,
-    },
-    {
-        accessorKey: "descripcion_servicio",
-        header: ({ column }) => <SortableHeader column={column} title="DESCRIPCION DEL SERVICIO" />,
-        size: 157, minSize: 157, maxSize: 400, enableResizing: true,
         cell: (props: any) => <EditableCell {...props} className="text-zinc-900" />,
     },
     {
@@ -142,33 +130,6 @@ export const columnsAdmin: ColumnDef<ProgramacionServicio>[] = [
         header: ({ column }) => <SortableHeader column={column} title="AUTORIZADO" className="bg-indigo-50/50 text-indigo-900" />,
         size: 180, minSize: 120, maxSize: 300, enableResizing: true,
         cell: AutorizacionCell,
-    },
-    {
-        accessorKey: "dias_atraso_lab",
-        header: ({ column }) => <SortableHeader column={column} title={`DIAS ATRASO\nENVIO COTIZ`} />,
-        size: 110, minSize: 90, maxSize: 150, enableResizing: true,
-        cell: ({ row }) => {
-            const estimatedDateStr = row.original.fecha_entrega_estimada
-            const realDateStr = row.original.entrega_real
-
-            if (!estimatedDateStr) return <div className="text-zinc-300 text-center">-</div>
-            const estimated = new Date(estimatedDateStr)
-            const real = realDateStr ? new Date(realDateStr) : new Date()
-            estimated.setHours(0, 0, 0, 0); real.setHours(0, 0, 0, 0)
-
-            const diffTime = real.getTime() - estimated.getTime()
-            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-
-            if (!realDateStr && diffDays <= 0) {
-                return <div className="text-center font-mono text-zinc-900 text-sm">0</div>
-            }
-
-            return (
-                <div className={`text-center font-mono text-sm ${diffDays > 0 ? "text-red-600 font-bold" : "text-zinc-900"}`}>
-                    {diffDays > 0 ? `+${diffDays}` : diffDays}
-                </div>
-            )
-        }
     },
     {
         accessorKey: "nota_admin",
