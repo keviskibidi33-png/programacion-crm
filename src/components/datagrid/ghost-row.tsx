@@ -4,6 +4,8 @@ import { cn } from "@/lib/utils"
 import { ProgramacionServicio } from "@/types/programacion"
 import { z } from "zod"
 import { StatusSelect } from "./status-select"
+import { PaymentSelect } from "./payment-select"
+import { AuthorizationSelect } from "./authorization-select"
 
 // Zod Schema for validation
 const insertSchema = z.object({
@@ -252,6 +254,7 @@ export function GhostRow<TData>({ table, onInsert }: GhostRowProps<TData>) {
                 const isReadOnly = colId === 'item_numero'
                 const isNumeric = colId === 'dias_atraso_lab' || colId === 'dias_atraso_envio_coti'
                 const isStatus = colId === 'estado_trabajo'
+                const isPaymentStatus = colId === 'estado_pago'
                 const isAutorizacion = colId === 'autorizacion_lab'
                 const isDate = colId.includes('fecha') || colId === 'entrega_real'
 
@@ -271,21 +274,21 @@ export function GhostRow<TData>({ table, onInsert }: GhostRowProps<TData>) {
                     isLastPinned && "shadow-[inset_-1px_0_0_0_#d4d4d8,0_1px_0_0_#e4e4e7,4px_0_5px_-2px_rgba(0,0,0,0.05)]"
                 )
 
-                if (isAutorizacion) {
-                    return (
-                        <td key={`ghost-${colId}`} style={tdStyle} className={tdClassName}>
-                            <div className="w-full text-center text-zinc-300 text-[10px] select-none italic text-lg">-</div>
-                        </td>
-                    )
-                }
-
                 return (
                     <td key={`ghost-${colId}`} style={tdStyle} className={tdClassName}>
                         {isReadOnly ? (
                             <div className="px-1 text-zinc-400 italic text-base font-semibold">+</div>
                         ) : isStatus ? (
                             <div className="w-full h-full flex items-center justify-center">
-                                <StatusSelect value={value as string} onChange={(val) => handleChange(colId, val)} />
+                                <StatusSelect value={value} onChange={(val) => handleChange(colId, val)} />
+                            </div>
+                        ) : isPaymentStatus ? (
+                            <div className="w-full h-full flex items-center justify-center">
+                                <PaymentSelect value={value} onChange={(val) => handleChange(colId, val)} />
+                            </div>
+                        ) : isAutorizacion ? (
+                            <div className="w-full h-full flex items-center justify-center">
+                                <AuthorizationSelect value={value} onChange={(val) => handleChange(colId, val)} />
                             </div>
                         ) : (
                             <input
