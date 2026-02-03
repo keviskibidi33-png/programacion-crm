@@ -103,23 +103,34 @@ export function useProgramacionData() {
     }, [queryClient, supabase])
 
     const insertRow = useCallback(async (newRow: Partial<ProgramacionServicio>) => {
+        // Prepare data for programacion_lab (base table)
+        const labData: any = {
+            ...newRow,
+            estado_trabajo: newRow.estado_trabajo || "PENDIENTE",
+        }
+
+        // Remove fields that don't belong to programacion_lab
+        delete labData.item_numero // Auto-generated
+        delete labData.fecha_solicitud_com
+        delete labData.fecha_entrega_com
+        delete labData.evidencia_solicitud_envio
+        delete labData.motivo_dias_atraso_com
+        delete labData.numero_factura
+        delete labData.estado_pago
+        delete labData.estado_autorizar
+        delete labData.nota_admin
+        delete labData.dias_atraso_envio_coti // Computed field
+
+        // Remove undefined/null values to avoid sending them to Supabase
+        Object.keys(labData).forEach(key => {
+            if (labData[key] === undefined || labData[key] === null || labData[key] === '') {
+                delete labData[key]
+            }
+        })
+
         const { data: insertedData, error: labError } = await supabase
             .from("programacion_lab")
-            .insert({
-                ...newRow,
-                item_numero: undefined,
-                created_at: new Date().toISOString(),
-                estado_trabajo: newRow.estado_trabajo || "PENDIENTE",
-                // Extension fields must be removed for the base table insert
-                fecha_solicitud_com: undefined,
-                fecha_entrega_com: undefined,
-                evidencia_solicitud_envio: undefined,
-                motivo_dias_atraso_com: undefined,
-                numero_factura: undefined,
-                estado_pago: undefined,
-                estado_autorizar: undefined,
-                nota_admin: undefined,
-            })
+            .insert(labData)
             .select()
             .single()
 
