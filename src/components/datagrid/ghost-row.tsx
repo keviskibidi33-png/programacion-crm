@@ -265,7 +265,7 @@ export function GhostRow<TData>({ table, onInsert }: GhostRowProps<TData>) {
                 }
 
                 const tdClassName = cn(
-                    "px-2 py-1.5 align-middle",
+                    "px-2 py-3 align-middle",
                     isPinned ? "bg-white hover:!bg-blue-200" : "bg-white",
                     isPinned ? "shadow-[inset_-1px_0_0_0_#d4d4d8,0_1px_0_0_#e4e4e7]" : "shadow-[inset_-1px_0_0_0_#e4e4e7,0_1px_0_0_#e4e4e7]",
                     isLastPinned && "shadow-[inset_-1px_0_0_0_#d4d4d8,0_1px_0_0_#e4e4e7,4px_0_5px_-2px_rgba(0,0,0,0.05)]"
@@ -274,7 +274,7 @@ export function GhostRow<TData>({ table, onInsert }: GhostRowProps<TData>) {
                 if (isAutorizacion) {
                     return (
                         <td key={`ghost-${colId}`} style={tdStyle} className={tdClassName}>
-                            <div className="w-full text-center text-zinc-300 text-[10px] select-none italic">-</div>
+                            <div className="w-full text-center text-zinc-300 text-[10px] select-none italic text-lg">-</div>
                         </td>
                     )
                 }
@@ -282,7 +282,7 @@ export function GhostRow<TData>({ table, onInsert }: GhostRowProps<TData>) {
                 return (
                     <td key={`ghost-${colId}`} style={tdStyle} className={tdClassName}>
                         {isReadOnly ? (
-                            <div className="px-1 text-zinc-400 italic text-xs font-semibold">+</div>
+                            <div className="px-1 text-zinc-400 italic text-base font-semibold">+</div>
                         ) : isStatus ? (
                             <div className="w-full h-full flex items-center justify-center">
                                 <StatusSelect value={value as string} onChange={(val) => handleChange(colId, val)} />
@@ -291,7 +291,7 @@ export function GhostRow<TData>({ table, onInsert }: GhostRowProps<TData>) {
                             <input
                                 type={isNumeric ? "number" : "text"}
                                 className={cn(
-                                    "ghost-row-input w-full bg-transparent border-none focus:outline-none focus:ring-1 focus:ring-blue-400 rounded text-sm h-full px-1 font-medium text-zinc-900",
+                                    "ghost-row-input w-full bg-transparent border-none focus:outline-none focus:ring-1 focus:ring-blue-400 rounded text-base h-10 px-2 font-medium text-zinc-900 border border-zinc-100 shadow-sm",
                                     "placeholder:text-zinc-300 placeholder:italic",
                                     error && "bg-red-50 text-red-900 ring-1 ring-inset ring-red-500 placeholder:text-red-400",
                                     isSubmitting && "opacity-50 cursor-wait"

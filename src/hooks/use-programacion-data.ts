@@ -16,7 +16,7 @@ export function useProgramacionData() {
             const { data, error } = await supabase
                 .from("cuadro_control")
                 .select("*")
-                .order("item_numero", { ascending: false })
+                .order("item_numero", { ascending: true })
 
             if (error) {
                 console.error("Error fetching data:", error)
