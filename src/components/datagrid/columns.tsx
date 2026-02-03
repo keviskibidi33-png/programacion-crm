@@ -785,7 +785,7 @@ export const columnsLab: ColumnDef<ProgramacionServicio>[] = [
         enablePinning: true,
         enableResizing: false,
         cell: (props) => (
-            <div className="line-clamp-2 leading-tight">
+            <div className="line-clamp-2 leading-tight break-words">
                 <EditableCell {...props} className="text-[12.5px] leading-3 text-zinc-900 font-medium" />
             </div>
         )
@@ -797,7 +797,11 @@ export const columnsLab: ColumnDef<ProgramacionServicio>[] = [
         minSize: 100,
         maxSize: 400,
         enableResizing: true,
-        cell: (props) => <EditableCell {...props} className="text-zinc-900" />,
+        cell: (props) => (
+            <div className="line-clamp-2 whitespace-normal break-words leading-tight" title={props.getValue() as string}>
+                <EditableCell {...props} className="text-zinc-900" />
+            </div>
+        ),
     },
     {
         accessorKey: "descripcion_servicio",
@@ -807,7 +811,11 @@ export const columnsLab: ColumnDef<ProgramacionServicio>[] = [
         maxSize: 157,
         enablePinning: true,
         enableResizing: false,
-        cell: (props) => <EditableCell {...props} className="text-zinc-900" />,
+        cell: (props) => (
+            <div className="line-clamp-3 whitespace-normal break-words leading-tight" title={props.getValue() as string}>
+                <EditableCell {...props} className="text-zinc-900" />
+            </div>
+        ),
     },
     {
         accessorKey: "entrega_real",
