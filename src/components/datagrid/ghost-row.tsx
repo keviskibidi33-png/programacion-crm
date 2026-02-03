@@ -241,6 +241,60 @@ export function GhostRow<TData>({ table, onInsert }: GhostRowProps<TData>) {
         return placeholders[colId] || "..."
     }
 
+    // Get user role and view mode from table meta
+    const meta = table.options.meta as { userRole?: string; viewMode?: string } | undefined
+    const userRole = meta?.userRole || ''
+    const viewMode = meta?.viewMode || ''
+
+    // Permission check function (similar to columns.tsx)
+    const getCanWriteColumn = (columnId: string): boolean => {
+        // Role restrictions for ADMIN
+        if (userRole === 'admin') {
+            if (viewMode === 'LAB') {
+                const blockedColumns = ['cotizacion_lab', 'autorizacion_lab']
+                if (blockedColumns.includes(columnId)) return false
+            }
+            if (viewMode === 'COM') {
+                const blockedColumns = ['estado_pago']
+                if (blockedColumns.includes(columnId)) return false
+            }
+            if (viewMode === 'ADMIN') {
+                const blockedColumns = ['cotizacion_lab']
+                if (blockedColumns.includes(columnId)) return false
+            }
+            return true
+        }
+
+        // Role: laboratorio_lector - Cannot edit anything
+        if (userRole === 'laboratorio_lector' || userRole.includes('lector')) {
+            return false
+        }
+
+        // Role: laboratorio_tipificador - Can edit everything EXCEPT cotizacion_lab, autorizacion_lab
+        if (userRole === 'laboratorio_tipificador' || (userRole.includes('laboratorio') && userRole.includes('tipificador'))) {
+            const blockedColumns = ['cotizacion_lab', 'autorizacion_lab']
+            if (blockedColumns.includes(columnId)) return false
+            return true
+        }
+
+        // Role: vendor - Can edit everything EXCEPT estado_pago
+        if (userRole === 'vendor' || userRole.includes('vendedor') || userRole.includes('asesor') || userRole.includes('comercial')) {
+            const blockedColumns = ['estado_pago']
+            if (blockedColumns.includes(columnId)) return false
+            return true
+        }
+
+        // Role: laboratorio - Can edit everything EXCEPT estado_pago
+        if (userRole === 'laboratorio') {
+            const blockedColumns = ['estado_pago']
+            if (blockedColumns.includes(columnId)) return false
+            return true
+        }
+
+        // Default: allow editing
+        return true
+    }
+
     return (
         <tr className="group hover:bg-blue-100/50 transition-colors">
             {table.getAllLeafColumns().map((column, colIndex) => {
@@ -257,6 +311,9 @@ export function GhostRow<TData>({ table, onInsert }: GhostRowProps<TData>) {
                 const isPaymentStatus = colId === 'estado_pago'
                 const isAutorizacion = colId === 'autorizacion_lab'
                 const isDate = colId.includes('fecha') || colId === 'entrega_real'
+
+                // Check permissions for this column
+                const canWrite = getCanWriteColumn(colId)
 
                 // Common TD styles matching data-table.tsx
                 const tdStyle = {
@@ -278,6 +335,8 @@ export function GhostRow<TData>({ table, onInsert }: GhostRowProps<TData>) {
                     <td key={`ghost-${colId}`} style={tdStyle} className={tdClassName}>
                         {isReadOnly ? (
                             <div className="px-1 text-zinc-400 italic text-base font-semibold">+</div>
+                        ) : !canWrite ? (
+                            <div className="w-full text-center text-zinc-300 text-sm select-none italic">-</div>
                         ) : isStatus ? (
                             <div className="w-full h-full flex items-center justify-center">
                                 <StatusSelect value={value} onChange={(val) => handleChange(colId, val)} />
