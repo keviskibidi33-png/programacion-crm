@@ -784,7 +784,7 @@ export const columnsLab: ColumnDef<ProgramacionServicio>[] = [
         maxSize: 160,
         enablePinning: true,
         enableResizing: false,
-        cell: (props) => <EditableCell {...props} className="text-[12.5px] leading-3 text-zinc-900 font-medium break-words" />,
+        cell: (props) => <EditableCell {...props} className="text-[12.5px] leading-3 text-zinc-900 font-medium break-words whitespace-normal" />,
     },
     {
         accessorKey: "proyecto",
@@ -793,7 +793,7 @@ export const columnsLab: ColumnDef<ProgramacionServicio>[] = [
         minSize: 100,
         maxSize: 400,
         enableResizing: true,
-        cell: (props) => <EditableCell {...props} className="text-zinc-900 break-words" />,
+        cell: (props) => <EditableCell {...props} className="text-zinc-900 break-words whitespace-normal" />,
     },
     {
         accessorKey: "descripcion_servicio",
@@ -803,7 +803,7 @@ export const columnsLab: ColumnDef<ProgramacionServicio>[] = [
         maxSize: 157,
         enablePinning: true,
         enableResizing: false,
-        cell: (props) => <EditableCell {...props} className="text-zinc-900 break-words" />,
+        cell: (props) => <EditableCell {...props} className="text-zinc-900 break-words whitespace-normal" />,
     },
     {
         accessorKey: "entrega_real",
