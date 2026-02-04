@@ -45,6 +45,7 @@ export type EditableCellProps<TData> = {
 }
 
 // Editable Cell Component
+// Editable Cell Component
 const EditableCell = React.memo(({ getValue, row: { original }, column: { id }, table, className }: EditableCellProps<ProgramacionServicio>) => {
     const initialValue = getValue()
     const [value, setValue] = React.useState(initialValue)
@@ -54,71 +55,40 @@ const EditableCell = React.memo(({ getValue, row: { original }, column: { id }, 
     const meta = table.options.meta as any
     const userRole = (meta?.userRole || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
 
-    // Role-based column restrictions
-    // lector = NO puede editar NADA
-    // tipificador = Puede editar TODO excepto cotizacion_lab, autorizacion_lab
-    // vendor = Puede editar TODO excepto estado_pago
-    // administrativo = Puede editar TODO excepto cotizacion_lab
-    // admin = Puede editar TODO
-
     const getCanWriteColumn = (): boolean => {
-        // If global canWrite is explicitly false, block everything
-        const globalCanWrite = meta?.canWrite
-        const viewMode = meta?.viewMode || ""
+        // 1. GLOBAL OVERRIDE (Read-only tab)
+        if (meta?.canWrite === false) return false
 
-        // Role restrictions for ADMIN: should follow the view's specific logic
-        if (userRole === 'admin') {
-            if (viewMode === 'LAB') {
-                const blockedColumns = ['cotizacion_lab', 'autorizacion_lab']
-                if (blockedColumns.includes(id)) return false
-            }
-            if (viewMode === 'COM') {
-                const blockedColumns = ['estado_pago']
-                if (blockedColumns.includes(id)) return false
-            }
-            if (viewMode === 'ADMIN') {
-                const blockedColumns = ['cotizacion_lab', 'cliente_nombre', 'proyecto']
-                if (blockedColumns.includes(id)) return false
-            }
-            return true
-        }
+        // 2. ROLE-SPECIFIC COLUMN LOCKS
+        // lector = NO puede editar NADA
+        if (userRole === 'laboratorio_lector' || userRole.includes('lector')) return false
 
-        // Role: laboratorio_lector - Cannot edit anything
-        if (userRole === 'laboratorio_lector' || userRole.includes('lector')) {
-            return false
-        }
-
-        // Role: laboratorio_tipificador - Can edit everything EXCEPT cotizacion_lab, autorizacion_lab
+        // tipificador = Puede editar TODO excepto cotizacion_lab
         if (userRole === 'laboratorio_tipificador' || (userRole.includes('laboratorio') && userRole.includes('tipificador'))) {
-            const blockedColumns = ['cotizacion_lab', 'autorizacion_lab']
+            const blockedColumns = ['cotizacion_lab']
             if (blockedColumns.includes(id)) return false
             return true
         }
 
-        // Role: vendor (vendedor) - Can edit everything EXCEPT estado_pago
+        // vendor = Puede editar TODO excepto estado_pago
         if (userRole === 'vendor' || userRole.includes('vendedor') || userRole.includes('asesor') || userRole.includes('comercial')) {
             const blockedColumns = ['estado_pago']
             if (blockedColumns.includes(id)) return false
             return true
         }
 
-        // Role: administrativo - Can edit everything EXCEPT cotizacion_lab
-        if (userRole === 'administrativo') {
+        // administrativo = Puede editar TODO excepto cotizacion_lab, cliente_nombre, proyecto
+        if (userRole === 'administrativo' || userRole.includes('administrativo')) {
             const blockedColumns = ['cotizacion_lab', 'cliente_nombre', 'proyecto']
             if (blockedColumns.includes(id)) return false
             return true
         }
 
-        // If global canWrite is explicitly false, override everything to read-only
-        if (globalCanWrite === false) return false
-
-        // Default: use global canWrite from permissions
-        return globalCanWrite ?? false
+        // 3. DEFAULT: use global canWrite
+        return meta?.canWrite ?? false
     }
 
     const canWrite = getCanWriteColumn()
-
-
 
     // Sync external changes
     React.useEffect(() => {
@@ -154,7 +124,7 @@ const EditableCell = React.memo(({ getValue, row: { original }, column: { id }, 
     }
 
     const isDate = id.includes('fecha') || id === 'entrega_real'
-    const colorClass = canWrite ? "text-zinc-900" : "text-zinc-900"
+    const colorClass = "text-zinc-900"
     const textSize = className?.includes('text-') ? '' : 'text-sm'
 
     if (!canWrite) {

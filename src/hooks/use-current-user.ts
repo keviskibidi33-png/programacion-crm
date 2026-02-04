@@ -29,23 +29,26 @@ export function useCurrentUser() {
         // Role-based mapping for known roles (before DB load)
         const rNorm = (qRole || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
 
-        // Map role_ids to their expected views (based on database permissions)
+        // Map role_ids to their expected views
         const roleViewMap: Record<string, ViewMode[]> = {
-            'admin': ['LAB', 'COM', 'ADMIN'],           // Superadmin: all views
-            'administrativo': ['LAB', 'ADMIN'],          // Administrativo: admin + read-only lab
-            'vendor': ['LAB', 'COM'],                    // Vendor: commercial + read-only lab
-            'laboratorio_lector': ['LAB'],               // Lab reader: only lab view
-            'laboratorio_tipificador': ['LAB']           // Lab tipificador: only lab view
+            'admin': ['LAB', 'COM', 'ADMIN'],
+            'administrativo': ['LAB', 'ADMIN'],
+            'vendor': ['LAB', 'COM'],
+            'vendedor': ['LAB', 'COM'],
+            'comercial': ['LAB', 'COM'],
+            'laboratorio_lector': ['LAB'],
+            'laboratorio_tipificador': ['LAB']
         }
 
-        // Use exact match first, then fall back to heuristics
+        // Use exact match first
         if (roleViewMap[rNorm]) {
             return roleViewMap[rNorm]
         }
 
         // Heuristic fallback for unknown roles
         if (rNorm === 'admin' || qIsAdmin) return ['LAB', 'COM', 'ADMIN']
-        if (rNorm.includes('comercial') || rNorm.includes('vendor') || rNorm.includes('vendedor')) return ['LAB', 'COM']
+        if (rNorm.includes('comercial') || rNorm.includes('vendor') || rNorm.includes('vendedor') || rNorm.includes('asesor')) return ['LAB', 'COM']
+        if (rNorm.includes('administrativo')) return ['LAB', 'ADMIN']
         if (rNorm.includes('laboratorio')) return ['LAB']
 
         // Default: wait for DB permissions (show only the requested mode)
@@ -58,24 +61,31 @@ export function useCurrentUser() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [permissions, setPermissions] = useState<any>(() => {
         // Initial permissions: minimal until DB load completes
-        // We only grant write if qCanWrite or qIsAdmin are explicitly true
         const rNorm = (qRole || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
         const isSuperAdmin = rNorm === 'admin' || qIsAdmin
         const dynamicCanWrite = qCanWrite || isSuperAdmin
 
         return {
             laboratorio: {
-                read: isSuperAdmin || rNorm.includes('laboratorio') || rNorm === 'administrativo' || rNorm === 'vendor',
+                read: true, // Everyone with access to Programacion can read Lab (at least read-only)
                 write: dynamicCanWrite && (isSuperAdmin || rNorm.includes('laboratorio')),
                 delete: false
             },
             programacion: {
-                read: isSuperAdmin || rNorm.includes('laboratorio') || rNorm === 'administrativo' || rNorm === 'vendor',
+                read: true,
                 write: dynamicCanWrite && (isSuperAdmin || rNorm.includes('laboratorio')),
                 delete: false
             },
-            comercial: { read: isSuperAdmin || rNorm.includes('comercial') || rNorm.includes('vendor') || rNorm.includes('vendedor'), write: dynamicCanWrite, delete: false },
-            administracion: { read: isSuperAdmin || rNorm === 'administrativo', write: dynamicCanWrite, delete: false }
+            comercial: {
+                read: isSuperAdmin || rNorm.includes('comercial') || rNorm.includes('vendor') || rNorm.includes('vendedor') || rNorm.includes('asesor'),
+                write: dynamicCanWrite && (isSuperAdmin || rNorm.includes('comercial') || rNorm.includes('vendor') || rNorm.includes('vendedor') || rNorm.includes('asesor')),
+                delete: false
+            },
+            administracion: {
+                read: isSuperAdmin || rNorm.includes('administrativo'),
+                write: dynamicCanWrite && (isSuperAdmin || rNorm.includes('administrativo')),
+                delete: false
+            }
         }
     })
 
@@ -120,9 +130,6 @@ export function useCurrentUser() {
             // 2. Sync basic identity state
             if (qRole) setRole(qRole)
 
-            // 3. NO initial view calculation - wait for DB permissions
-            // (Initial views are set by useState based on role heuristics)
-
 
             // 4. Fetch Profile & Permissions Matrix
             try {
@@ -158,20 +165,33 @@ export function useCurrentUser() {
                         if (dbPerms.comercial?.read) dbViews.push("COM")
                         if (dbPerms.administracion?.read) dbViews.push("ADMIN")
 
+                        // Special case: Ensure Administrativo and Vendor always have LAB access
+                        const dbRoleNorm = (dbRole || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+                        const isVendor = dbRoleNorm.includes('vendedor') || dbRoleNorm.includes('comercial') || dbRoleNorm.includes('vendor') || dbRoleNorm.includes('asesor')
+                        const isAdminRole = dbRoleNorm.includes('administrativo')
+
+                        if (isVendor) {
+                            dbViews.push("LAB")
+                            dbViews.push("COM")
+                        }
+                        if (isAdminRole) {
+                            dbViews.push("LAB")
+                            dbViews.push("ADMIN")
+                        }
+
                         // Special case: Only 'admin' (superadmin) gets all views unconditionally
-                        const dbRoleNorm = (dbRole || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-                        const isSuperAdmin = dbRoleNorm === "admin" // Only exact 'admin' role
+                        const isSuperAdmin = dbRoleNorm === "admin"
 
                         if (isSuperAdmin) {
                             setAllowedViews(["LAB", "COM", "ADMIN"])
-                        } else if (dbViews.length > 0) {
-                            setAllowedViews([...new Set(dbViews)])
+                        } else {
+                            setAllowedViews([...new Set(dbViews)] as ViewMode[])
                         }
                     }
 
                 }
             } catch (_) {
-                // Fallback - Iframe running with URL context
+                // Fallback
             } finally {
                 setLoading(false)
             }
@@ -196,11 +216,10 @@ export function useCurrentUser() {
             // Priority 1: Superadmin always has access
             if (isSuperAdmin) return true
 
-            // Priority 2: View-specific overrides
+            // Logic shared with EditableCell: block write if viewing LAB as non-lab staff
             if (mode === "LAB") {
-                // Read-only for Administrativo and Vendor
-                if (rNorm === 'administrativo' || rNorm === 'vendor') return false
-                // Lab staff with write perms
+                const isLabStaff = rNorm.includes('laboratorio')
+                if (!isLabStaff) return false
                 return qCanWrite || permissions?.laboratorio?.write || permissions?.programacion?.write || false
             }
 
