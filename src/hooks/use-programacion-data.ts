@@ -1,17 +1,20 @@
 import { useEffect, useCallback, useState, useMemo } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { createClient } from "@/utils/supabase/client"
+import { useCurrentUser } from "./use-current-user"
 import { ProgramacionServicio } from "@/types/programacion"
 import { toast } from "sonner"
 
 export function useProgramacionData() {
     const supabase = useMemo(() => createClient(), [])
     const queryClient = useQueryClient()
+    const { loading: authLoading } = useCurrentUser()
     const [realtimeStatus, setRealtimeStatus] = useState<"CONNECTING" | "SUBSCRIBED" | "CHANNEL_ERROR" | "TIMED_OUT" | "CLOSED">("CONNECTING")
 
     // 1. Fetch Inicial (Carga los 2000 registros una vez)
     const { data: programacion = [], isLoading } = useQuery({
         queryKey: ["programacion"],
+        enabled: !authLoading, // Wait for session bridge to finish
         queryFn: async () => {
             const { data, error } = await supabase
                 .from("cuadro_control")
@@ -27,8 +30,10 @@ export function useProgramacionData() {
         },
     })
 
-    // 2. Suscripción Realtime (La magia para no dar F5)
+    // 2. Suscripción Realtime
     useEffect(() => {
+        if (authLoading) return // Wait for authentication
+
         const channel = supabase
             .channel("cuadro_control_changes")
             .on(
@@ -59,11 +64,10 @@ export function useProgramacionData() {
                 }
             })
 
-        // Limpieza al salir de la página
         return () => {
             supabase.removeChannel(channel)
         }
-    }, [queryClient, supabase])
+    }, [queryClient, supabase, authLoading])
 
     const updateField = useCallback(async (rowId: string, field: string, value: unknown) => {
         // 1. Optimistic Update in Cache
@@ -72,7 +76,6 @@ export function useProgramacionData() {
         })
 
         try {
-            // Route update to the correct table
             const commercialFields = ['fecha_solicitud_com', 'fecha_entrega_com', 'evidencia_solicitud_envio', 'dias_atraso_envio_coti', 'motivo_dias_atraso_com']
             const adminFields = ['numero_factura', 'estado_pago', 'estado_autorizar', 'nota_admin']
 
@@ -96,22 +99,17 @@ export function useProgramacionData() {
         } catch (error) {
             console.error("Update failed:", error)
             toast.error("Error al guardar")
-            // Rollback could be implemented by refetching or saving previous state, 
-            // but for simple text edits, just invalidating usually works enough or letting user retry
             queryClient.invalidateQueries({ queryKey: ["programacion"] })
         }
     }, [queryClient, supabase])
 
     const insertRow = useCallback(async (newRow: Partial<ProgramacionServicio>) => {
-        // Prepare data for programacion_lab (base table)
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const labData: any = {
             ...newRow,
             estado_trabajo: newRow.estado_trabajo || "PENDIENTE",
         }
 
-        // Remove fields that don't belong to programacion_lab
-        delete labData.item_numero // Auto-generated
+        delete labData.item_numero
         delete labData.fecha_solicitud_com
         delete labData.fecha_entrega_com
         delete labData.evidencia_solicitud_envio
@@ -120,9 +118,8 @@ export function useProgramacionData() {
         delete labData.estado_pago
         delete labData.estado_autorizar
         delete labData.nota_admin
-        delete labData.dias_atraso_envio_coti // Computed field
+        delete labData.dias_atraso_envio_coti
 
-        // Remove undefined/null values to avoid sending them to Supabase
         Object.keys(labData).forEach(key => {
             if (labData[key] === undefined || labData[key] === null || labData[key] === '') {
                 delete labData[key]
@@ -143,16 +140,12 @@ export function useProgramacionData() {
 
         if (insertedData) {
             const rowId = insertedData.id
-
-            // Check if we need to update extension tables
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const commercialData: any = {}
             if (newRow.fecha_solicitud_com) commercialData.fecha_solicitud_com = newRow.fecha_solicitud_com
             if (newRow.fecha_entrega_com) commercialData.fecha_entrega_com = newRow.fecha_entrega_com
             if (newRow.evidencia_solicitud_envio) commercialData.evidencia_solicitud_envio = newRow.evidencia_solicitud_envio
             if (newRow.motivo_dias_atraso_com) commercialData.motivo_dias_atraso_com = newRow.motivo_dias_atraso_com
 
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const adminData: any = {}
             if (newRow.numero_factura) adminData.numero_factura = newRow.numero_factura
             if (newRow.estado_pago) adminData.estado_pago = newRow.estado_pago
@@ -166,7 +159,6 @@ export function useProgramacionData() {
                 await supabase.from("programacion_administracion").update(adminData).eq("programacion_id", rowId)
             }
 
-            // The views will reload via realtime or cache invalidation
             queryClient.invalidateQueries({ queryKey: ["programacion"] })
         }
     }, [queryClient, supabase])

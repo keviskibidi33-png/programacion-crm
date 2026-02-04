@@ -17,11 +17,13 @@ export function useCurrentUser() {
     const qRole = searchParams.get("role")?.toLowerCase() || null
     const qCanWrite = searchParams.get("canWrite") === "true"
     const qIsAdmin = searchParams.get("isAdmin") === "true"
+    const passedToken = searchParams.get("token")
 
     const [role, setRole] = useState<string | null>(qRole)
     const [loading, setLoading] = useState(true)
     const [userId, setUserId] = useState<string | null>(qUserId)
     const [needsAuth, setNeedsAuth] = useState(false)
+    const [tokenApplied, setTokenApplied] = useState(false)
 
     const [allowedViews, setAllowedViews] = useState<ViewMode[]>(() => {
         // Role-based mapping for known roles (before DB load)
@@ -30,8 +32,8 @@ export function useCurrentUser() {
         // Map role_ids to their expected views (based on database permissions)
         const roleViewMap: Record<string, ViewMode[]> = {
             'admin': ['LAB', 'COM', 'ADMIN'],           // Superadmin: all views
-            'administrativo': ['ADMIN'],                 // Administrativo: only admin view
-            'vendor': ['COM'],                           // Vendor: only commercial view
+            'administrativo': ['LAB', 'ADMIN'],          // Administrativo: admin + read-only lab
+            'vendor': ['LAB', 'COM'],                    // Vendor: commercial + read-only lab
             'laboratorio_lector': ['LAB'],               // Lab reader: only lab view
             'laboratorio_tipificador': ['LAB']           // Lab tipificador: only lab view
         }
@@ -43,7 +45,7 @@ export function useCurrentUser() {
 
         // Heuristic fallback for unknown roles
         if (rNorm === 'admin' || qIsAdmin) return ['LAB', 'COM', 'ADMIN']
-        if (rNorm.includes('comercial') || rNorm.includes('vendor') || rNorm.includes('vendedor')) return ['COM']
+        if (rNorm.includes('comercial') || rNorm.includes('vendor') || rNorm.includes('vendedor')) return ['LAB', 'COM']
         if (rNorm.includes('laboratorio')) return ['LAB']
 
         // Default: wait for DB permissions (show only the requested mode)
@@ -62,8 +64,16 @@ export function useCurrentUser() {
         const dynamicCanWrite = qCanWrite || isSuperAdmin
 
         return {
-            laboratorio: { read: isSuperAdmin || rNorm.includes('laboratorio'), write: dynamicCanWrite && (isSuperAdmin || rNorm.includes('laboratorio')), delete: false },
-            programacion: { read: isSuperAdmin || rNorm.includes('laboratorio'), write: dynamicCanWrite && (isSuperAdmin || rNorm.includes('laboratorio')), delete: false },
+            laboratorio: {
+                read: isSuperAdmin || rNorm.includes('laboratorio') || rNorm === 'administrativo' || rNorm === 'vendor',
+                write: dynamicCanWrite && (isSuperAdmin || rNorm.includes('laboratorio')),
+                delete: false
+            },
+            programacion: {
+                read: isSuperAdmin || rNorm.includes('laboratorio') || rNorm === 'administrativo' || rNorm === 'vendor',
+                write: dynamicCanWrite && (isSuperAdmin || rNorm.includes('laboratorio')),
+                delete: false
+            },
             comercial: { read: isSuperAdmin || rNorm.includes('comercial') || rNorm.includes('vendor') || rNorm.includes('vendedor'), write: dynamicCanWrite, delete: false },
             administracion: { read: isSuperAdmin || rNorm === 'administrativo', write: dynamicCanWrite, delete: false }
         }
@@ -72,6 +82,20 @@ export function useCurrentUser() {
     useEffect(() => {
         async function fetchIdentityAndPerms() {
             setLoading(true)
+
+            // 0. Session Auth Bridge (for RLS)
+            if (passedToken && !tokenApplied) {
+                console.log("[useCurrentUser] Setting session token from parent URL...")
+                try {
+                    await supabase.auth.setSession({
+                        access_token: passedToken,
+                        refresh_token: ""
+                    })
+                    setTokenApplied(true)
+                } catch (e) {
+                    console.error("[useCurrentUser] Error setting bridged session:", e)
+                }
+            }
 
             // 1. Get User ID (either from URL or Supabase Session)
             let currentUid = qUserId
@@ -100,7 +124,7 @@ export function useCurrentUser() {
             // (Initial views are set by useState based on role heuristics)
 
 
-            // 4. Fetch Profile & Permissions Matrix (silently handle 406 errors from FK join)
+            // 4. Fetch Profile & Permissions Matrix
             try {
                 const { data: profile, error: profileError } = await supabase
                     .from("perfiles")
@@ -108,15 +132,13 @@ export function useCurrentUser() {
                     .eq("id", currentUid)
                     .single()
 
-                // Silently ignore 406 errors (FK relation issues) - URL context is sufficient
                 if (profileError) {
-                    // Don't log - this is expected in Iframe context
                     setLoading(false)
                     return
                 }
 
                 if (profile) {
-                    const dbRole = profile.role?.toLowerCase()
+                    const dbRole = (profile as any).role?.toLowerCase()
                     if (!sourceOfTruthIsUrl) setRole(dbRole)
 
                     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -168,18 +190,23 @@ export function useCurrentUser() {
         permissions,
         getCanView: (mode: ViewMode) => allowedViews.includes(mode),
         getCanWrite: (mode: ViewMode) => {
-            // Priority 1: URL explicit flags (for smooth Iframe experience)
-            if (qIsAdmin) return true
+            const rNorm = (role || qRole || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+            const isSuperAdmin = rNorm === 'admin' || qIsAdmin
+
+            // Priority 1: Superadmin always has access
+            if (isSuperAdmin) return true
+
+            // Priority 2: View-specific overrides
+            if (mode === "LAB") {
+                // Read-only for Administrativo and Vendor
+                if (rNorm === 'administrativo' || rNorm === 'vendor') return false
+                // Lab staff with write perms
+                return qCanWrite || permissions?.laboratorio?.write || permissions?.programacion?.write || false
+            }
+
+            // Priority 3: Default behavior for other views
             if (qCanWrite) return true
 
-            // Priority 2: Superadmin bypass (only exact 'admin' role)
-            const rNorm = (role || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-            if (rNorm === 'admin') return true
-
-            // Priority 3: Granular Matrix Permissions from Database
-            if (mode === "LAB") {
-                return permissions?.laboratorio?.write || permissions?.programacion?.write || false
-            }
             if (mode === "COM") {
                 return permissions?.comercial?.write || false
             }

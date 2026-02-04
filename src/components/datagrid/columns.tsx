@@ -109,6 +109,9 @@ const EditableCell = React.memo(({ getValue, row: { original }, column: { id }, 
             return true
         }
 
+        // If global canWrite is explicitly false, override everything to read-only
+        if (globalCanWrite === false) return false
+
         // Default: use global canWrite from permissions
         return globalCanWrite ?? false
     }
@@ -219,6 +222,7 @@ const OTCell = React.memo(({ getValue, row: { original }, column: { id }, table 
     const userRole = (meta?.userRole || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
 
     const getCanWriteColumn = (): boolean => {
+        if (meta?.canWrite === false) return false
         if (userRole === 'admin') return true
         if (userRole === 'laboratorio_lector' || userRole.includes('lector')) return false
         if (userRole === 'laboratorio_tipificador' || (userRole.includes('laboratorio') && userRole.includes('tipificador'))) return true
@@ -302,6 +306,7 @@ const SmartDateCell = React.memo(({ getValue, row: { original }, column: { id },
     const userRole = (meta?.userRole || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
 
     const getCanWriteColumn = (): boolean => {
+        if (meta?.canWrite === false) return false
         if (userRole === 'admin') return true
         if (userRole === 'laboratorio_lector' || userRole.includes('lector')) return false
         if (userRole === 'laboratorio_tipificador' || (userRole.includes('laboratorio') && userRole.includes('tipificador'))) return true
@@ -435,6 +440,7 @@ const CodigoMuestraCell = React.memo(({ getValue, row: { original }, column: { i
     const userRole = (meta?.userRole || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
 
     const getCanWriteColumn = (): boolean => {
+        if (meta?.canWrite === false) return false
         if (userRole === 'admin') return true
         if (userRole === 'laboratorio_lector' || userRole.includes('lector')) return false
         if (userRole === 'laboratorio_tipificador' || (userRole.includes('laboratorio') && userRole.includes('tipificador'))) return true
@@ -521,6 +527,7 @@ const CotizacionCell = React.memo(({ getValue, row: { original }, column: { id }
     const userRole = (meta?.userRole || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
 
     const getCanEditCotizacion = (): boolean => {
+        if (meta?.canWrite === false) return false
         const viewMode = meta?.viewMode || ""
         if (userRole === 'admin') {
             if (viewMode === 'LAB' || viewMode === 'ADMIN') return false
@@ -612,6 +619,7 @@ const StatusCell = React.memo(({ getValue, row: { original }, column: { id }, ta
     const userRole = (meta?.userRole || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
 
     const getCanEditStatus = (): boolean => {
+        if (meta?.canWrite === false) return false
         if (userRole === 'admin') return true
         // lector cannot edit anything
         if (userRole === 'laboratorio_lector' || userRole.includes('lector')) return false
@@ -649,6 +657,7 @@ const AutorizacionCell = React.memo(({ getValue, row: { original }, column: { id
     const userRole = (meta?.userRole || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
 
     const getCanEditAutorizacion = (): boolean => {
+        if (meta?.canWrite === false) return false
         const viewMode = meta?.viewMode || ""
         if (userRole === 'admin') {
             if (viewMode === 'LAB') return false
@@ -692,6 +701,7 @@ const PaymentStatusCell = React.memo(({ getValue, row, column: { id }, table }: 
     const userRole = (meta?.userRole || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
 
     const getCanEditPayment = (): boolean => {
+        if (meta?.canWrite === false) return false
         const viewMode = meta?.viewMode || ""
         if (userRole === 'admin') {
             if (viewMode === 'COM') return false
