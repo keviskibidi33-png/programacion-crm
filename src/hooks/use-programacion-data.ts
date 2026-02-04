@@ -16,8 +16,8 @@ export function useProgramacionData() {
         queryKey: ["programacion"],
         enabled: !authLoading, // Wait for session bridge to finish
         queryFn: async () => {
-            const { data, error } = await supabase
-                .from("cuadro_control")
+            const { data, error } = await (supabase
+                .from("cuadro_control") as any)
                 .select("*")
                 .order("item_numero", { ascending: true })
 
@@ -90,8 +90,8 @@ export function useProgramacionData() {
                 idField = "programacion_id"
             }
 
-            const { error } = await supabase
-                .from(targetTable)
+            const { error } = await (supabase
+                .from(targetTable) as any)
                 .update({ [field]: value, updated_at: new Date().toISOString() })
                 .eq(idField, rowId)
 
@@ -126,8 +126,8 @@ export function useProgramacionData() {
             }
         })
 
-        const { data: insertedData, error: labError } = await supabase
-            .from("programacion_lab")
+        const { data: insertedData, error: labError } = await (supabase
+            .from("programacion_lab") as any)
             .insert(labData)
             .select()
             .single()
@@ -139,7 +139,7 @@ export function useProgramacionData() {
         }
 
         if (insertedData) {
-            const rowId = insertedData.id
+            const rowId = (insertedData as any).id
             const commercialData: any = {}
             if (newRow.fecha_solicitud_com) commercialData.fecha_solicitud_com = newRow.fecha_solicitud_com
             if (newRow.fecha_entrega_com) commercialData.fecha_entrega_com = newRow.fecha_entrega_com
@@ -153,10 +153,10 @@ export function useProgramacionData() {
             if (newRow.nota_admin) adminData.nota_admin = newRow.nota_admin
 
             if (Object.keys(commercialData).length > 0) {
-                await supabase.from("programacion_comercial").update(commercialData).eq("programacion_id", rowId)
+                await (supabase.from("programacion_comercial") as any).update(commercialData).eq("programacion_id", rowId)
             }
             if (Object.keys(adminData).length > 0) {
-                await supabase.from("programacion_administracion").update(adminData).eq("programacion_id", rowId)
+                await (supabase.from("programacion_administracion") as any).update(adminData).eq("programacion_id", rowId)
             }
 
             queryClient.invalidateQueries({ queryKey: ["programacion"] })
