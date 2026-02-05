@@ -844,8 +844,8 @@ export const columnsLab: ColumnDef<ProgramacionServicio>[] = [
     },
 
     {
-        accessorKey: "nota_admin",
-        header: ({ column }) => <SortableHeader column={column} title="NOTA" className="text-base font-semibold" />,
+        accessorKey: "nota_lab",
+        header: ({ column }) => <SortableHeader column={column} title="NOTA LAB" className="text-base font-semibold" />,
         size: 350,
         minSize: 250,
         maxSize: 700,
