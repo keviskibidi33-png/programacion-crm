@@ -166,7 +166,7 @@ export function useProgramacionData() {
     const exportToExcel = useCallback(async (items: ProgramacionServicio[]) => {
         const toastId = toast.loading("Generando Excel...")
         try {
-            const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://api.geofal.com.pe"
             const response = await fetch(`${apiUrl}/programacion/export`, {
                 method: "POST",
                 headers: {
