@@ -163,11 +163,20 @@ export function useProgramacionData() {
         }
     }, [queryClient, supabase])
 
-    const exportToExcel = useCallback(async (items: ProgramacionServicio[]) => {
+    const exportToExcel = useCallback(async (items: ProgramacionServicio[], mode: 'lab' | 'comercial' | 'administracion' = 'lab') => {
         const toastId = toast.loading("Generando Excel...")
         try {
             const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://api.geofal.com.pe"
-            const response = await fetch(`${apiUrl}/programacion/export`, {
+
+            // Determine endpoint based on mode
+            const endpointMap = {
+                'lab': '/programacion/export',
+                'comercial': '/programacion/export/comercial',
+                'administracion': '/programacion/export/administracion'
+            }
+            const endpoint = endpointMap[mode] || '/programacion/export'
+
+            const response = await fetch(`${apiUrl}${endpoint}`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -184,7 +193,11 @@ export function useProgramacionData() {
             const url = window.URL.createObjectURL(blob)
             const a = document.createElement("a")
             a.href = url
-            a.download = `Programacion_${new Date().toISOString().split("T")[0]}.xlsx`
+
+            // Filename based on mode
+            const modeLabels = { 'lab': 'Lab', 'comercial': 'Comercial', 'administracion': 'Administracion' }
+            a.download = `Programacion_${modeLabels[mode]}_${new Date().toISOString().split("T")[0]}.xlsx`
+
             document.body.appendChild(a)
             a.click()
             window.URL.revokeObjectURL(url)

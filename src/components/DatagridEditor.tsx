@@ -184,7 +184,10 @@ export function DatagridEditor() {
 
                 <div className="flex items-center gap-3">
                     <button
-                        onClick={() => exportToExcel(data)}
+                        onClick={() => {
+                            const modeMap = { 'LAB': 'lab', 'COM': 'comercial', 'ADMIN': 'administracion' } as const
+                            exportToExcel(data, modeMap[viewMode])
+                        }}
                         disabled={data.length === 0}
                         className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-xs font-medium transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
                     >
