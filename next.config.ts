@@ -15,15 +15,29 @@ const nextConfig: NextConfig = {
         headers: [
           { key: "Access-Control-Allow-Credentials", value: "true" },
           { key: "Access-Control-Allow-Origin", value: "*" },
-          { key: "Access-Control-Allow-Methods", value: "GET,OPTIONS,PATCH,DELETE,POST,PUT" },
-          { key: "Access-Control-Allow-Headers", value: "X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version" },
-          // Allow framing from anywhere in dev (adjust for prod)
-          { key: "Content-Security-Policy", value: "frame-ancestors *" },
-          { key: "X-Frame-Options", value: "ALLOWALL" } // Legacy support
-        ]
-      }
-    ]
-  }
+          {
+            key: "Access-Control-Allow-Methods",
+            value: "GET,OPTIONS,PATCH,DELETE,POST,PUT",
+          },
+          {
+            key: "Access-Control-Allow-Headers",
+            value:
+              "X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version",
+          },
+          // Allow framing from CRM origin
+          {
+            key: "Content-Security-Policy",
+            value:
+              "frame-ancestors 'self' https://crm.geofal.com.pe http://localhost:3000 http://127.0.0.1:3000",
+          },
+          {
+            key: "X-Frame-Options",
+            value: "ALLOW-FROM https://crm.geofal.com.pe",
+          },
+        ],
+      },
+    ];
+  },
 };
 
 export default nextConfig;
