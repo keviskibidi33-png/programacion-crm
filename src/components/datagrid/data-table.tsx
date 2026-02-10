@@ -50,6 +50,7 @@ interface DataTableProps<TData, TValue> {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     permissions?: any
     viewMode?: string
+    onFilteredDataChange?: (data: TData[]) => void
 }
 
 export function DataTable<TData, TValue>({
@@ -61,7 +62,8 @@ export function DataTable<TData, TValue>({
     userRole,
     canWrite,
     permissions,
-    viewMode
+    viewMode,
+    onFilteredDataChange
 }: DataTableProps<TData, TValue>) {
     const [sorting, setSorting] = React.useState<SortingState>([])
     const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
@@ -133,6 +135,14 @@ export function DataTable<TData, TValue>({
         estimateSize: () => 40, // Base row height
         overscan: 20, // Buffer rows
     })
+
+    // Notify parent about filtered items
+    React.useEffect(() => {
+        if (onFilteredDataChange) {
+            const filteredItems = table.getFilteredRowModel().rows.map(row => row.original)
+            onFilteredDataChange(filteredItems)
+        }
+    }, [table.getFilteredRowModel().rows, onFilteredDataChange])
 
     return (
         <div className="flex flex-col h-full bg-white font-sans text-sm">

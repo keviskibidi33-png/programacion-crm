@@ -817,6 +817,7 @@ export const columnsLab: ColumnDef<ProgramacionServicio>[] = [
         minSize: 160,
         maxSize: 280,
         enableResizing: true,
+        filterFn: "equals",
         cell: StatusCell,
     },
     {
@@ -840,6 +841,7 @@ export const columnsLab: ColumnDef<ProgramacionServicio>[] = [
         minSize: 100,
         maxSize: 200,
         enableResizing: true,
+        filterFn: "equals",
         cell: AutorizacionCell,
     },
 

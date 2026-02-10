@@ -16,6 +16,10 @@ export function DatagridEditor() {
     const searchParams = useSearchParams()
     const modeParam = searchParams.get('mode')
     const { loading: authLoading, role, allowedViews, getCanView, getCanWrite, needsAuth, permissions } = useCurrentUser()
+    const { data, isLoading, realtimeStatus, updateField, insertRow, exportToExcel } = useProgramacionData()
+
+    // State to track filtered data for Excel export
+    const [filteredItems, setFilteredItems] = React.useState<any[]>([])
 
     // Initialize state based on URL param, with role-based fallback
     const roleParam = searchParams.get('role') || ''
@@ -84,8 +88,6 @@ export function DatagridEditor() {
             }
         }
     }, [authLoading, needsAuth, allowedViews, viewMode, role])
-
-    const { data, isLoading, realtimeStatus, updateField, insertRow, exportToExcel } = useProgramacionData()
 
     // Determine which columns to show based on view mode
     const currentColumns = React.useMemo(() => {
@@ -186,7 +188,7 @@ export function DatagridEditor() {
                     <button
                         onClick={() => {
                             const modeMap = { 'LAB': 'lab', 'COM': 'comercial', 'ADMIN': 'administracion' } as const
-                            exportToExcel(data, modeMap[viewMode])
+                            exportToExcel(filteredItems, modeMap[viewMode])
                         }}
                         disabled={data.length === 0}
                         className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-xs font-medium transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
@@ -224,6 +226,7 @@ export function DatagridEditor() {
                     canWrite={canWrite}
                     permissions={permissions}
                     viewMode={viewMode}
+                    onFilteredDataChange={setFilteredItems}
                     key={viewMode} // Force remount on view change to reset table state
                 />
             </div>

@@ -129,6 +129,7 @@ export const columnsAdmin: ColumnDef<ProgramacionServicio>[] = [
         accessorKey: "autorizacion_lab",
         header: ({ column }) => <SortableHeader column={column} title="AUTORIZADO" className="bg-indigo-50/50 text-indigo-900" />,
         size: 180, minSize: 120, maxSize: 300, enableResizing: true,
+        filterFn: "equals",
         cell: AutorizacionCell,
     },
     {
