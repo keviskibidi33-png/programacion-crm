@@ -92,6 +92,12 @@ export const columnsAdmin: ColumnDef<ProgramacionServicio>[] = [
         cell: ({ getValue }) => <div className="text-zinc-900 font-medium px-2">{getValue() as string}</div>,
     },
     {
+        accessorKey: "fecha_recepcion",
+        header: ({ column }) => <SortableHeader column={column} title="FECHA REC." />,
+        size: 110, minSize: 110, maxSize: 110, enableResizing: false,
+        cell: ({ getValue }) => <div className="text-zinc-600 font-medium text-xs text-center">{getValue() as string || '-'}</div>,
+    },
+    {
         accessorKey: "cliente_nombre",
         header: ({ column }) => <SortableHeader column={column} title="CLIENTE" />,
         size: 200, minSize: 150, maxSize: 400, enableResizing: true,
