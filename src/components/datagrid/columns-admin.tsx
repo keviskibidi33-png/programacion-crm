@@ -102,7 +102,7 @@ export const columnsAdmin: ColumnDef<ProgramacionServicio>[] = [
         header: ({ column }) => <SortableHeader column={column} title="CLIENTE" />,
         size: 200, minSize: 150, maxSize: 400, enableResizing: true,
         cell: ({ getValue, row, column, table }) => (
-            <EditableCell getValue={getValue} row={row} column={column} table={table} className="text-[12.5px] leading-tight break-words whitespace-normal" />
+            <EditableCell getValue={getValue} row={row} column={column} table={table} className="text-[12.5px] leading-tight wrap-break-word whitespace-normal" />
         )
     },
     {
@@ -110,8 +110,7 @@ export const columnsAdmin: ColumnDef<ProgramacionServicio>[] = [
         header: ({ column }) => <SortableHeader column={column} title="PROYECTO" />,
         size: 150, minSize: 100, maxSize: 400, enableResizing: true,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        cell: (props: any) => <EditableCell {...props} className="text-zinc-900 break-words whitespace-normal" />,
+        cell: (props: any) => <EditableCell {...props} className="text-zinc-900 wrap-break-word whitespace-normal" />,
     },
     {
         accessorKey: "cotizacion_lab",
@@ -143,7 +142,6 @@ export const columnsAdmin: ColumnDef<ProgramacionServicio>[] = [
         header: ({ column }) => <SortableHeader column={column} title="NOTA ADMIN" />,
         size: 250, minSize: 150, maxSize: 600, enableResizing: true,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        cell: (props: any) => <EditableCell {...props} className="text-xs break-words whitespace-normal" />,
+        cell: (props: any) => <EditableCell {...props} className="text-xs wrap-break-word whitespace-normal" />,
     }
 ]
