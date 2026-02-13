@@ -1,9 +1,23 @@
-import { useEffect, useCallback, useState, useMemo } from "react"
+import { useEffect, useCallback, useState, useMemo, useRef } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { createClient } from "@/utils/supabase/client"
 import { useCurrentUser } from "./use-current-user"
 import { ProgramacionServicio } from "@/types/programacion"
 import { toast } from "sonner"
+
+// ---------------------------------------------------------------------------
+// Debounce helper: coalesce rapid realtime events into a single refetch
+// ---------------------------------------------------------------------------
+function useDebouncedCallback<T extends (...args: unknown[]) => void>(fn: T, delay: number) {
+    const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
+    const stableFn = useRef(fn)
+    stableFn.current = fn
+
+    return useCallback((...args: unknown[]) => {
+        if (timer.current) clearTimeout(timer.current)
+        timer.current = setTimeout(() => stableFn.current(...args), delay)
+    }, [delay]) as unknown as T
+}
 
 export function useProgramacionData() {
     const supabase = useMemo(() => createClient(), [])
@@ -11,10 +25,13 @@ export function useProgramacionData() {
     const { loading: authLoading } = useCurrentUser()
     const [realtimeStatus, setRealtimeStatus] = useState<"CONNECTING" | "SUBSCRIBED" | "CHANNEL_ERROR" | "TIMED_OUT" | "CLOSED">("CONNECTING")
 
+    // Track IDs we just changed locally so realtime can skip self-echoes
+    const pendingLocalIds = useRef<Set<string>>(new Set())
+
     // 1. Fetch Inicial (Carga los 2000 registros una vez)
     const { data: programacion = [], isLoading } = useQuery({
         queryKey: ["programacion"],
-        enabled: !authLoading, // Wait for session bridge to finish
+        enabled: !authLoading,
         queryFn: async () => {
             const { data, error } = await (supabase
                 .from("cuadro_control") as any)
@@ -30,32 +47,84 @@ export function useProgramacionData() {
         },
     })
 
-    // 2. Suscripción Realtime
+    // 2. Debounced refetch — coalesce bursts into 1 call
+    const debouncedRefetch = useDebouncedCallback(() => {
+        queryClient.invalidateQueries({ queryKey: ["programacion"] })
+    }, 1500)
+
+    // 3. Realtime: merge remote changes into cache without full refetch
+    const handleRealtimePayload = useCallback((payload: any) => {
+        const id = payload.new?.id || payload.new?.programacion_id
+            || payload.old?.id || payload.old?.programacion_id
+
+        // Skip events caused by our own writes (already applied optimistically)
+        if (id && pendingLocalIds.current.has(id)) {
+            pendingLocalIds.current.delete(id)
+            return
+        }
+
+        const eventType = payload.eventType
+
+        if (eventType === "DELETE") {
+            // Remove deleted row from cache
+            queryClient.setQueryData(["programacion"], (old: ProgramacionServicio[] = []) =>
+                old.filter(r => r.id !== id)
+            )
+            return
+        }
+
+        if (eventType === "INSERT") {
+            // A new row was inserted by another user — do a debounced full fetch
+            // because the view (cuadro_control) joins multiple tables, payload only has 1 table
+            debouncedRefetch()
+            return
+        }
+
+        // UPDATE — merge the changed fields into the cached row
+        if (eventType === "UPDATE" && payload.new) {
+            const changed = payload.new
+            queryClient.setQueryData(["programacion"], (old: ProgramacionServicio[] = []) => {
+                const matchId = changed.id || changed.programacion_id
+                const found = old.some(r => r.id === matchId)
+                if (!found) {
+                    // Row not in cache — might be from a joined table, debounce refetch
+                    debouncedRefetch()
+                    return old
+                }
+                return old.map(row => {
+                    if (row.id !== matchId) return row
+                    // Merge only the changed keys into the existing row
+                    const merged = { ...row }
+                    for (const key of Object.keys(changed)) {
+                        if (key === "id" || key === "programacion_id") continue
+                        ;(merged as any)[key] = changed[key]
+                    }
+                    return merged
+                })
+            })
+        }
+    }, [queryClient, debouncedRefetch])
+
+    // 4. Suscripción Realtime — sin invalidateQueries directo
     useEffect(() => {
-        if (authLoading) return // Wait for authentication
+        if (authLoading) return
 
         const channel = supabase
-            .channel("cuadro_control_changes")
+            .channel("programacion_realtime")
             .on(
                 "postgres_changes",
                 { event: "*", schema: "public", table: "programacion_lab" },
-                (_payload) => {
-                    queryClient.invalidateQueries({ queryKey: ["programacion"] })
-                }
+                handleRealtimePayload
             )
             .on(
                 "postgres_changes",
                 { event: "*", schema: "public", table: "programacion_comercial" },
-                (_payload) => {
-                    queryClient.invalidateQueries({ queryKey: ["programacion"] })
-                }
+                handleRealtimePayload
             )
             .on(
                 "postgres_changes",
                 { event: "*", schema: "public", table: "programacion_administracion" },
-                (_payload) => {
-                    queryClient.invalidateQueries({ queryKey: ["programacion"] })
-                }
+                handleRealtimePayload
             )
             .subscribe((status) => {
                 setRealtimeStatus(status)
@@ -67,13 +136,16 @@ export function useProgramacionData() {
         return () => {
             supabase.removeChannel(channel)
         }
-    }, [queryClient, supabase, authLoading])
+    }, [supabase, authLoading, handleRealtimePayload])
 
     const updateField = useCallback(async (rowId: string, field: string, value: unknown) => {
-        // 1. Optimistic Update in Cache
+        // 1. Optimistic Update in Cache (instant UI)
         queryClient.setQueryData(["programacion"], (oldData: ProgramacionServicio[] = []) => {
             return oldData.map(row => row.id === rowId ? { ...row, [field]: value } : row)
         })
+
+        // 2. Mark this ID so realtime skips the echo
+        pendingLocalIds.current.add(rowId)
 
         try {
             const commercialFields = ['fecha_solicitud_com', 'fecha_entrega_com', 'evidencia_solicitud_envio', 'dias_atraso_envio_coti', 'motivo_dias_atraso_com']
@@ -99,6 +171,8 @@ export function useProgramacionData() {
         } catch (error) {
             console.error("Update failed:", error)
             toast.error("Error al guardar")
+            pendingLocalIds.current.delete(rowId)
+            // Rollback: refetch true state from DB
             queryClient.invalidateQueries({ queryKey: ["programacion"] })
         }
     }, [queryClient, supabase])
@@ -140,6 +214,9 @@ export function useProgramacionData() {
 
         if (insertedData) {
             const rowId = (insertedData as any).id
+            // Mark so realtime skips our own insert echoes
+            pendingLocalIds.current.add(rowId)
+
             const commercialData: any = {}
             if (newRow.fecha_solicitud_com) commercialData.fecha_solicitud_com = newRow.fecha_solicitud_com
             if (newRow.fecha_entrega_com) commercialData.fecha_entrega_com = newRow.fecha_entrega_com
@@ -159,6 +236,7 @@ export function useProgramacionData() {
                 await (supabase.from("programacion_administracion") as any).update(adminData).eq("programacion_id", rowId)
             }
 
+            // Single controlled refetch after full insert completes
             queryClient.invalidateQueries({ queryKey: ["programacion"] })
         }
     }, [queryClient, supabase])
