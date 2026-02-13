@@ -6,17 +6,20 @@ import { ProgramacionServicio } from "@/types/programacion"
 import { toast } from "sonner"
 
 // ---------------------------------------------------------------------------
-// Debounce helper: coalesce rapid realtime events into a single refetch
+// Helpers
 // ---------------------------------------------------------------------------
-function useDebouncedCallback<T extends (...args: unknown[]) => void>(fn: T, delay: number) {
-    const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
-    const stableFn = useRef(fn)
-    stableFn.current = fn
 
-    return useCallback((...args: unknown[]) => {
-        if (timer.current) clearTimeout(timer.current)
-        timer.current = setTimeout(() => stableFn.current(...args), delay)
-    }, [delay]) as unknown as T
+/** Set that auto-expires entries after `ttl` ms. Prevents single-delete
+ *  issues when Supabase fires multiple realtime events for a single write
+ *  (e.g. lab INSERT ➜ auto-trigger creates commercial & admin rows). */
+class ExpiringSet {
+    private map = new Map<string, ReturnType<typeof setTimeout>>()
+    add(id: string, ttl = 4000) {
+        if (this.map.has(id)) clearTimeout(this.map.get(id)!)
+        this.map.set(id, setTimeout(() => this.map.delete(id), ttl))
+    }
+    has(id: string) { return this.map.has(id) }
+    clear() { this.map.forEach(t => clearTimeout(t)); this.map.clear() }
 }
 
 export function useProgramacionData() {
@@ -25,14 +28,14 @@ export function useProgramacionData() {
     const { loading: authLoading } = useCurrentUser()
     const [realtimeStatus, setRealtimeStatus] = useState<"CONNECTING" | "SUBSCRIBED" | "CHANNEL_ERROR" | "TIMED_OUT" | "CLOSED">("CONNECTING")
 
-    // Track IDs we just changed locally so realtime can skip self-echoes
-    const pendingLocalIds = useRef<Set<string>>(new Set())
+    // IDs written locally — kept for 4 s so ALL cascade events are skipped
+    const pendingLocalIds = useRef(new ExpiringSet())
 
-    // 1. Fetch Inicial (Carga los 2000 registros una vez)
+    // 1. Fetch Inicial (Carga los 2000 registros una sola vez)
     const { data: programacion = [], isLoading } = useQuery({
         queryKey: ["programacion"],
         enabled: !authLoading,
-        staleTime: Infinity, // Never auto-refetch — we rely on Realtime merge
+        staleTime: Infinity,
         refetchOnWindowFocus: false,
         refetchOnReconnect: false,
         queryFn: async () => {
@@ -50,24 +53,14 @@ export function useProgramacionData() {
         },
     })
 
-    // 2. Debounced refetch — coalesce bursts into 1 call
-    const debouncedRefetch = useDebouncedCallback(() => {
-        queryClient.invalidateQueries({ queryKey: ["programacion"] })
-    }, 1500)
-
-    // 3. Realtime: merge remote changes into cache without full refetch
+    // 2. Realtime handler — NEVER calls invalidateQueries for UPDATEs
     const handleRealtimePayload = useCallback((payload: any) => {
         const rec = payload.new || payload.old || {}
-        // For commercial/admin tables the row's own "id" is NOT the view key.
-        // The view key is always the lab row's id = programacion_id in those tables.
-        // So: prefer programacion_id when it exists (joined table), fall back to id (lab table).
         const viewId: string | undefined = rec.programacion_id || rec.id
 
-        // Skip events caused by our own writes (already applied optimistically).
-        // We stored the *lab id* (= view id) in pendingLocalIds, so check viewId.
+        // Skip ALL events caused by our own writes (kept 4 s in ExpiringSet)
         if (viewId && pendingLocalIds.current.has(viewId)) {
-            pendingLocalIds.current.delete(viewId)
-            return
+            return // don't delete — let it expire naturally to catch cascades
         }
 
         const eventType = payload.eventType
@@ -79,21 +72,29 @@ export function useProgramacionData() {
             return
         }
 
-        if (eventType === "INSERT") {
-            // New row by another user — debounced fetch (view needs join)
-            debouncedRefetch()
+        // INSERT from another user — add to cache directly from joined-view fetch
+        // of just that one row, NOT a full refetch
+        if (eventType === "INSERT" && viewId) {
+            // Fetch only the new row from the view
+            ;(supabase.from("cuadro_control") as any)
+                .select("*")
+                .eq("id", viewId)
+                .maybeSingle()
+                .then(({ data: newRow }: any) => {
+                    if (!newRow) return
+                    queryClient.setQueryData(["programacion"], (old: ProgramacionServicio[] = []) => {
+                        // Avoid duplicates
+                        if (old.some(r => r.id === newRow.id)) return old
+                        return [...old, newRow]
+                    })
+                })
             return
         }
 
-        // UPDATE — merge changed fields into the cached row
+        // UPDATE — merge changed fields in-place (zero network)
         if (eventType === "UPDATE" && payload.new) {
             const changed = payload.new
             queryClient.setQueryData(["programacion"], (old: ProgramacionServicio[] = []) => {
-                const found = old.some(r => r.id === viewId)
-                if (!found) {
-                    // Not in cache — silently ignore (avoid refetch flicker)
-                    return old
-                }
                 return old.map(row => {
                     if (row.id !== viewId) return row
                     const merged = { ...row }
@@ -105,9 +106,9 @@ export function useProgramacionData() {
                 })
             })
         }
-    }, [queryClient, debouncedRefetch])
+    }, [queryClient, supabase])
 
-    // 4. Suscripción Realtime — sin invalidateQueries directo
+    // 3. Suscripción Realtime — ZERO invalidateQueries
     useEffect(() => {
         if (authLoading) return
 
@@ -238,8 +239,15 @@ export function useProgramacionData() {
                 await (supabase.from("programacion_administracion") as any).update(adminData).eq("programacion_id", rowId)
             }
 
-            // Single controlled refetch after full insert completes
-            queryClient.invalidateQueries({ queryKey: ["programacion"] })
+            // Add to cache directly from view (single-row fetch, NOT full refetch)
+            const { data: viewRow } = await (supabase.from("cuadro_control") as any)
+                .select("*").eq("id", rowId).maybeSingle()
+            if (viewRow) {
+                queryClient.setQueryData(["programacion"], (old: ProgramacionServicio[] = []) => {
+                    if (old.some(r => r.id === viewRow.id)) return old
+                    return [...old, viewRow]
+                })
+            }
         }
     }, [queryClient, supabase])
 
