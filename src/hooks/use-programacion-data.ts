@@ -19,6 +19,7 @@ class ExpiringSet {
         this.map.set(id, setTimeout(() => this.map.delete(id), ttl))
     }
     has(id: string) { return this.map.has(id) }
+    delete(id: string) { if (this.map.has(id)) { clearTimeout(this.map.get(id)!); this.map.delete(id) } }
     clear() { this.map.forEach(t => clearTimeout(t)); this.map.clear() }
 }
 
