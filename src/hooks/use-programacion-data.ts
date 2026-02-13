@@ -32,6 +32,9 @@ export function useProgramacionData() {
     const { data: programacion = [], isLoading } = useQuery({
         queryKey: ["programacion"],
         enabled: !authLoading,
+        staleTime: Infinity, // Never auto-refetch — we rely on Realtime merge
+        refetchOnWindowFocus: false,
+        refetchOnReconnect: false,
         queryFn: async () => {
             const { data, error } = await (supabase
                 .from("cuadro_control") as any)
@@ -54,49 +57,48 @@ export function useProgramacionData() {
 
     // 3. Realtime: merge remote changes into cache without full refetch
     const handleRealtimePayload = useCallback((payload: any) => {
-        const id = payload.new?.id || payload.new?.programacion_id
-            || payload.old?.id || payload.old?.programacion_id
+        const rec = payload.new || payload.old || {}
+        // For commercial/admin tables the row's own "id" is NOT the view key.
+        // The view key is always the lab row's id = programacion_id in those tables.
+        // So: prefer programacion_id when it exists (joined table), fall back to id (lab table).
+        const viewId: string | undefined = rec.programacion_id || rec.id
 
-        // Skip events caused by our own writes (already applied optimistically)
-        if (id && pendingLocalIds.current.has(id)) {
-            pendingLocalIds.current.delete(id)
+        // Skip events caused by our own writes (already applied optimistically).
+        // We stored the *lab id* (= view id) in pendingLocalIds, so check viewId.
+        if (viewId && pendingLocalIds.current.has(viewId)) {
+            pendingLocalIds.current.delete(viewId)
             return
         }
 
         const eventType = payload.eventType
 
         if (eventType === "DELETE") {
-            // Remove deleted row from cache
             queryClient.setQueryData(["programacion"], (old: ProgramacionServicio[] = []) =>
-                old.filter(r => r.id !== id)
+                old.filter(r => r.id !== viewId)
             )
             return
         }
 
         if (eventType === "INSERT") {
-            // A new row was inserted by another user — do a debounced full fetch
-            // because the view (cuadro_control) joins multiple tables, payload only has 1 table
+            // New row by another user — debounced fetch (view needs join)
             debouncedRefetch()
             return
         }
 
-        // UPDATE — merge the changed fields into the cached row
+        // UPDATE — merge changed fields into the cached row
         if (eventType === "UPDATE" && payload.new) {
             const changed = payload.new
             queryClient.setQueryData(["programacion"], (old: ProgramacionServicio[] = []) => {
-                const matchId = changed.id || changed.programacion_id
-                const found = old.some(r => r.id === matchId)
+                const found = old.some(r => r.id === viewId)
                 if (!found) {
-                    // Row not in cache — might be from a joined table, debounce refetch
-                    debouncedRefetch()
+                    // Not in cache — silently ignore (avoid refetch flicker)
                     return old
                 }
                 return old.map(row => {
-                    if (row.id !== matchId) return row
-                    // Merge only the changed keys into the existing row
+                    if (row.id !== viewId) return row
                     const merged = { ...row }
                     for (const key of Object.keys(changed)) {
-                        if (key === "id" || key === "programacion_id") continue
+                        if (key === "id" || key === "programacion_id" || key === "created_at") continue
                         ;(merged as any)[key] = changed[key]
                     }
                     return merged
