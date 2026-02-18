@@ -97,6 +97,9 @@ export function useCurrentUser() {
             if (passedToken && !tokenApplied) {
                 console.log("[useCurrentUser] Setting session token from parent URL...")
                 try {
+                    if (typeof window !== "undefined") {
+                        localStorage.setItem("programacion_access_token", passedToken)
+                    }
                     await supabase.auth.setSession({
                         access_token: passedToken,
                         refresh_token: ""

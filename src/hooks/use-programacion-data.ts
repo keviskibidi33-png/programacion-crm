@@ -31,6 +31,40 @@ export function useProgramacionData() {
 
     // IDs written locally — kept for 4 s so ALL cascade events are skipped
     const pendingLocalIds = useRef(new ExpiringSet())
+    const requestTokenFromParent = useCallback(async (): Promise<string | null> => {
+        if (typeof window === "undefined" || window.parent === window) {
+            return null
+        }
+
+        return await new Promise((resolve) => {
+            let resolved = false
+
+            const cleanup = () => {
+                window.removeEventListener("message", onMessage)
+                clearTimeout(timeoutId)
+            }
+
+            const onMessage = (event: MessageEvent) => {
+                if (event.data?.type === "TOKEN_REFRESH" && event.data?.token) {
+                    resolved = true
+                    cleanup()
+                    const token = String(event.data.token)
+                    localStorage.setItem("programacion_access_token", token)
+                    resolve(token)
+                }
+            }
+
+            const timeoutId = window.setTimeout(() => {
+                if (!resolved) {
+                    cleanup()
+                    resolve(null)
+                }
+            }, 2500)
+
+            window.addEventListener("message", onMessage)
+            window.parent.postMessage({ type: "TOKEN_REFRESH_REQUEST" }, "*")
+        })
+    }, [])
 
     // 1. Fetch Inicial (Carga los 2000 registros una sola vez)
     const { data: programacion = [], isLoading } = useQuery({
@@ -260,10 +294,20 @@ export function useProgramacionData() {
             const urlToken = typeof window !== "undefined"
                 ? new URLSearchParams(window.location.search).get("token")
                 : null
-            const accessToken = session?.access_token || urlToken
+            const localToken = typeof window !== "undefined"
+                ? localStorage.getItem("programacion_access_token")
+                : null
+            const parentToken = session?.access_token || urlToken || localToken
+                ? null
+                : await requestTokenFromParent()
+            const accessToken = session?.access_token || urlToken || localToken || parentToken
 
             if (!accessToken) {
                 throw new Error("Token de autenticación requerido para exportar")
+            }
+
+            if (typeof window !== "undefined" && accessToken) {
+                localStorage.setItem("programacion_access_token", accessToken)
             }
 
             // Determine endpoint based on mode
@@ -306,7 +350,7 @@ export function useProgramacionData() {
             console.error("Export error:", error)
             toast.error("Error al generar Excel", { id: toastId })
         }
-    }, [supabase])
+    }, [requestTokenFromParent, supabase])
 
     return {
         data: programacion,
