@@ -256,6 +256,15 @@ export function useProgramacionData() {
         const toastId = toast.loading("Generando Excel...")
         try {
             const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://api.geofal.com.pe"
+            const { data: { session } } = await supabase.auth.getSession()
+            const urlToken = typeof window !== "undefined"
+                ? new URLSearchParams(window.location.search).get("token")
+                : null
+            const accessToken = session?.access_token || urlToken
+
+            if (!accessToken) {
+                throw new Error("Token de autenticación requerido para exportar")
+            }
 
             // Determine endpoint based on mode
             const endpointMap = {
@@ -269,6 +278,7 @@ export function useProgramacionData() {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
+                    "Authorization": `Bearer ${accessToken}`,
                 },
                 body: JSON.stringify({ items }),
             })
@@ -296,7 +306,7 @@ export function useProgramacionData() {
             console.error("Export error:", error)
             toast.error("Error al generar Excel", { id: toastId })
         }
-    }, [])
+    }, [supabase])
 
     return {
         data: programacion,
