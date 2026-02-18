@@ -23,6 +23,12 @@ class ExpiringSet {
     clear() { this.map.forEach(t => clearTimeout(t)); this.map.clear() }
 }
 
+const EXPORT_AUTH_TRACE_PREFIX = "[ProgramacionExportAuth]"
+
+function buildTraceId() {
+    return `prog-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+}
+
 export function useProgramacionData() {
     const supabase = useMemo(() => createClient(), [])
     const queryClient = useQueryClient()
@@ -65,13 +71,18 @@ export function useProgramacionData() {
         return null
     }, [])
 
-    const requestTokenFromParent = useCallback(async (): Promise<string | null> => {
+    const requestTokenFromParent = useCallback(async (traceId: string, timeoutMs = 5000): Promise<string | null> => {
         if (typeof window === "undefined" || window.parent === window) {
+            console.warn(`${EXPORT_AUTH_TRACE_PREFIX}[${traceId}] Parent token request skipped`, {
+                hasWindow: typeof window !== "undefined",
+                isIframe: typeof window !== "undefined" ? window.parent !== window : false,
+            })
             return null
         }
 
         return await new Promise<string | null>((resolve) => {
             let resolved = false
+            const startedAt = Date.now()
 
             const cleanup = () => {
                 window.removeEventListener("message", onMessage)
@@ -79,11 +90,18 @@ export function useProgramacionData() {
             }
 
             const onMessage = (event: MessageEvent) => {
+                if (event.source !== window.parent) return
+                if (event.data?.requestId && event.data.requestId !== traceId) return
                 if (event.data?.type === "TOKEN_REFRESH" && event.data?.token) {
                     resolved = true
                     cleanup()
                     const token = String(event.data.token)
                     localStorage.setItem("programacion_access_token", token)
+                    localStorage.setItem("token", token)
+                    console.info(`${EXPORT_AUTH_TRACE_PREFIX}[${traceId}] Token received from parent`, {
+                        elapsedMs: Date.now() - startedAt,
+                        origin: event.origin,
+                    })
                     resolve(token)
                 }
             }
@@ -91,12 +109,20 @@ export function useProgramacionData() {
             const timeoutId = window.setTimeout(() => {
                 if (!resolved) {
                     cleanup()
+                    console.error(`${EXPORT_AUTH_TRACE_PREFIX}[${traceId}] Parent token request timed out`, {
+                        timeoutMs,
+                        elapsedMs: Date.now() - startedAt,
+                    })
                     resolve(null)
                 }
-            }, 1200)
+            }, timeoutMs)
 
+            console.info(`${EXPORT_AUTH_TRACE_PREFIX}[${traceId}] Requesting token from parent`, {
+                timeoutMs,
+                origin: window.location.origin,
+            })
             window.addEventListener("message", onMessage)
-            window.parent.postMessage({ type: "TOKEN_REFRESH_REQUEST" }, "*")
+            window.parent.postMessage({ type: "TOKEN_REFRESH_REQUEST", requestId: traceId, source: "programacion_export" }, "*")
         })
     }, [])
 
@@ -322,6 +348,8 @@ export function useProgramacionData() {
 
     const exportToExcel = useCallback(async (items: ProgramacionServicio[], mode: 'lab' | 'comercial' | 'administracion' = 'lab') => {
         const toastId = toast.loading("Generando Excel...")
+        const traceId = buildTraceId()
+        const startedAt = Date.now()
         try {
             const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://api.geofal.com.pe"
             const { data: { session } } = await supabase.auth.getSession()
@@ -340,11 +368,22 @@ export function useProgramacionData() {
             const localToken = getStoredAccessToken()
             const parentToken = sessionToken || urlToken || localToken
                 ? null
-                : await requestTokenFromParent()
+                : await requestTokenFromParent(traceId, 5000)
             const accessToken = sessionToken || urlToken || localToken || parentToken
+
+            console.info(`${EXPORT_AUTH_TRACE_PREFIX}[${traceId}] Token source evaluation`, {
+                mode,
+                itemCount: items.length,
+                session: !!sessionToken,
+                url: !!urlToken,
+                local: !!localToken,
+                parent: !!parentToken,
+                elapsedMs: Date.now() - startedAt,
+            })
 
             if (!accessToken) {
                 const debug = {
+                    traceId,
                     session: !!sessionToken,
                     url: !!urlToken,
                     local: !!localToken,
@@ -352,7 +391,7 @@ export function useProgramacionData() {
                     iframe: typeof window !== "undefined" ? window.parent !== window : false,
                 }
                 if (typeof window !== "undefined" && window.parent !== window) {
-                    window.parent.postMessage({ type: "AUTH_REQUIRED", source: "programacion_export", debug }, "*")
+                    window.parent.postMessage({ type: "AUTH_REQUIRED", source: "programacion_export", debug, requestId: traceId }, "*")
                 }
                 throw new Error(`Token de autenticación requerido para exportar ${JSON.stringify(debug)}`)
             }
@@ -361,6 +400,10 @@ export function useProgramacionData() {
                 localStorage.setItem("programacion_access_token", accessToken)
                 localStorage.setItem("token", accessToken)
             }
+            console.info(`${EXPORT_AUTH_TRACE_PREFIX}[${traceId}] Token selected`, {
+                source: sessionToken ? "session" : urlToken ? "url" : localToken ? "local" : "parent",
+                elapsedMs: Date.now() - startedAt,
+            })
 
             // Determine endpoint based on mode
             const endpointMap = {
@@ -381,6 +424,12 @@ export function useProgramacionData() {
 
             if (!response.ok) {
                 const errorText = await response.text()
+                console.error(`${EXPORT_AUTH_TRACE_PREFIX}[${traceId}] Export endpoint failed`, {
+                    endpoint,
+                    status: response.status,
+                    statusText: response.statusText,
+                    elapsedMs: Date.now() - startedAt,
+                })
                 throw new Error(errorText || "Error al exportar")
             }
 
