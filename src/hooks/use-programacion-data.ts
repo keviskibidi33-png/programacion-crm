@@ -351,6 +351,9 @@ export function useProgramacionData() {
                     parent: !!parentToken,
                     iframe: typeof window !== "undefined" ? window.parent !== window : false,
                 }
+                if (typeof window !== "undefined" && window.parent !== window) {
+                    window.parent.postMessage({ type: "AUTH_REQUIRED", source: "programacion_export", debug }, "*")
+                }
                 throw new Error(`Token de autenticación requerido para exportar ${JSON.stringify(debug)}`)
             }
 
