@@ -93,15 +93,37 @@ export function useCurrentUser() {
         async function fetchIdentityAndPerms() {
             setLoading(true)
 
+            const getStoredToken = (): string | null => {
+                if (typeof window === "undefined") return null
+                const direct = localStorage.getItem("programacion_access_token") || localStorage.getItem("token")
+                if (direct) return direct
+                for (let i = 0; i < localStorage.length; i++) {
+                    const key = localStorage.key(i)
+                    if (!key || !key.startsWith("sb-") || !key.endsWith("-auth-token")) continue
+                    const raw = localStorage.getItem(key)
+                    if (!raw) continue
+                    try {
+                        const parsed = JSON.parse(raw)
+                        if (typeof parsed?.access_token === "string" && parsed.access_token) return parsed.access_token
+                        if (Array.isArray(parsed) && parsed[0]?.access_token) return parsed[0].access_token
+                    } catch {
+                        // ignore
+                    }
+                }
+                return null
+            }
+
             // 0. Session Auth Bridge (for RLS)
-            if (passedToken && !tokenApplied) {
+            const bridgeToken = passedToken || getStoredToken()
+            if (bridgeToken && !tokenApplied) {
                 console.log("[useCurrentUser] Setting session token from parent URL...")
                 try {
                     if (typeof window !== "undefined") {
-                        localStorage.setItem("programacion_access_token", passedToken)
+                        localStorage.setItem("programacion_access_token", bridgeToken)
+                        localStorage.setItem("token", bridgeToken)
                     }
                     await supabase.auth.setSession({
-                        access_token: passedToken,
+                        access_token: bridgeToken,
                         refresh_token: ""
                     })
                     setTokenApplied(true)

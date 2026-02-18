@@ -31,12 +31,41 @@ export function useProgramacionData() {
 
     // IDs written locally — kept for 4 s so ALL cascade events are skipped
     const pendingLocalIds = useRef(new ExpiringSet())
+    const getStoredAccessToken = useCallback((): string | null => {
+        if (typeof window === "undefined") return null
+
+        const direct = localStorage.getItem("programacion_access_token")
+            || localStorage.getItem("token")
+        if (direct) return direct
+
+        // Supabase stores session in keys like sb-<project-ref>-auth-token
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i)
+            if (!key || !key.startsWith("sb-") || !key.endsWith("-auth-token")) continue
+            const raw = localStorage.getItem(key)
+            if (!raw) continue
+            try {
+                const parsed = JSON.parse(raw)
+                if (typeof parsed?.access_token === "string" && parsed.access_token) {
+                    return parsed.access_token
+                }
+                if (Array.isArray(parsed) && parsed[0]?.access_token) {
+                    return parsed[0].access_token
+                }
+            } catch {
+                // Ignore malformed entries
+            }
+        }
+
+        return null
+    }, [])
+
     const requestTokenFromParent = useCallback(async (): Promise<string | null> => {
         if (typeof window === "undefined" || window.parent === window) {
             return null
         }
 
-        return await new Promise((resolve) => {
+        const requestOnce = async () => await new Promise<string | null>((resolve) => {
             let resolved = false
 
             const cleanup = () => {
@@ -59,11 +88,18 @@ export function useProgramacionData() {
                     cleanup()
                     resolve(null)
                 }
-            }, 2500)
+            }, 8000)
 
             window.addEventListener("message", onMessage)
             window.parent.postMessage({ type: "TOKEN_REFRESH_REQUEST" }, "*")
         })
+
+        const firstTry = await requestOnce()
+        if (firstTry) return firstTry
+
+        // Small retry in case parent listener attached slightly later
+        await new Promise((r) => setTimeout(r, 300))
+        return await requestOnce()
     }, [])
 
     // 1. Fetch Inicial (Carga los 2000 registros una sola vez)
@@ -294,9 +330,7 @@ export function useProgramacionData() {
             const urlToken = typeof window !== "undefined"
                 ? new URLSearchParams(window.location.search).get("token")
                 : null
-            const localToken = typeof window !== "undefined"
-                ? localStorage.getItem("programacion_access_token")
-                : null
+            const localToken = getStoredAccessToken()
             const parentToken = session?.access_token || urlToken || localToken
                 ? null
                 : await requestTokenFromParent()
@@ -308,6 +342,7 @@ export function useProgramacionData() {
 
             if (typeof window !== "undefined" && accessToken) {
                 localStorage.setItem("programacion_access_token", accessToken)
+                localStorage.setItem("token", accessToken)
             }
 
             // Determine endpoint based on mode
@@ -350,7 +385,7 @@ export function useProgramacionData() {
             console.error("Export error:", error)
             toast.error("Error al generar Excel", { id: toastId })
         }
-    }, [requestTokenFromParent, supabase])
+    }, [getStoredAccessToken, requestTokenFromParent, supabase])
 
     return {
         data: programacion,
