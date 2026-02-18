@@ -70,7 +70,7 @@ export function useProgramacionData() {
             return null
         }
 
-        const requestOnce = async () => await new Promise<string | null>((resolve) => {
+        return await new Promise<string | null>((resolve) => {
             let resolved = false
 
             const cleanup = () => {
@@ -93,18 +93,11 @@ export function useProgramacionData() {
                     cleanup()
                     resolve(null)
                 }
-            }, 2500)
+            }, 1200)
 
             window.addEventListener("message", onMessage)
             window.parent.postMessage({ type: "TOKEN_REFRESH_REQUEST" }, "*")
         })
-
-        const firstTry = await requestOnce()
-        if (firstTry) return firstTry
-
-        // Small retry in case parent listener attached slightly later
-        await new Promise((r) => setTimeout(r, 300))
-        return await requestOnce()
     }, [])
 
     // 1. Fetch Inicial (Carga los 2000 registros una sola vez)
