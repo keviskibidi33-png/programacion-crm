@@ -38,6 +38,15 @@ export function useProgramacionData() {
             || localStorage.getItem("token")
         if (direct) return direct
 
+        const extractToken = (parsed: any): string | null => {
+            if (!parsed) return null
+            if (typeof parsed?.access_token === "string" && parsed.access_token) return parsed.access_token
+            if (typeof parsed?.currentSession?.access_token === "string" && parsed.currentSession.access_token) return parsed.currentSession.access_token
+            if (typeof parsed?.session?.access_token === "string" && parsed.session.access_token) return parsed.session.access_token
+            if (Array.isArray(parsed) && typeof parsed[0]?.access_token === "string" && parsed[0].access_token) return parsed[0].access_token
+            return null
+        }
+
         // Supabase stores session in keys like sb-<project-ref>-auth-token
         for (let i = 0; i < localStorage.length; i++) {
             const key = localStorage.key(i)
@@ -46,12 +55,8 @@ export function useProgramacionData() {
             if (!raw) continue
             try {
                 const parsed = JSON.parse(raw)
-                if (typeof parsed?.access_token === "string" && parsed.access_token) {
-                    return parsed.access_token
-                }
-                if (Array.isArray(parsed) && parsed[0]?.access_token) {
-                    return parsed[0].access_token
-                }
+                const token = extractToken(parsed)
+                if (token) return token
             } catch {
                 // Ignore malformed entries
             }
@@ -88,7 +93,7 @@ export function useProgramacionData() {
                     cleanup()
                     resolve(null)
                 }
-            }, 8000)
+            }, 2500)
 
             window.addEventListener("message", onMessage)
             window.parent.postMessage({ type: "TOKEN_REFRESH_REQUEST" }, "*")
@@ -327,17 +332,33 @@ export function useProgramacionData() {
         try {
             const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://api.geofal.com.pe"
             const { data: { session } } = await supabase.auth.getSession()
+            let sessionToken = session?.access_token || null
+            if (!sessionToken) {
+                try {
+                    const { data } = await supabase.auth.refreshSession()
+                    sessionToken = data?.session?.access_token || null
+                } catch {
+                    // ignore refresh failures; fallback chain continues
+                }
+            }
             const urlToken = typeof window !== "undefined"
                 ? new URLSearchParams(window.location.search).get("token")
                 : null
             const localToken = getStoredAccessToken()
-            const parentToken = session?.access_token || urlToken || localToken
+            const parentToken = sessionToken || urlToken || localToken
                 ? null
                 : await requestTokenFromParent()
-            const accessToken = session?.access_token || urlToken || localToken || parentToken
+            const accessToken = sessionToken || urlToken || localToken || parentToken
 
             if (!accessToken) {
-                throw new Error("Token de autenticación requerido para exportar")
+                const debug = {
+                    session: !!sessionToken,
+                    url: !!urlToken,
+                    local: !!localToken,
+                    parent: !!parentToken,
+                    iframe: typeof window !== "undefined" ? window.parent !== window : false,
+                }
+                throw new Error(`Token de autenticación requerido para exportar ${JSON.stringify(debug)}`)
             }
 
             if (typeof window !== "undefined" && accessToken) {

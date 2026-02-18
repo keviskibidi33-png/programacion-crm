@@ -97,6 +97,16 @@ export function useCurrentUser() {
                 if (typeof window === "undefined") return null
                 const direct = localStorage.getItem("programacion_access_token") || localStorage.getItem("token")
                 if (direct) return direct
+
+                const extractToken = (parsed: any): string | null => {
+                    if (!parsed) return null
+                    if (typeof parsed?.access_token === "string" && parsed.access_token) return parsed.access_token
+                    if (typeof parsed?.currentSession?.access_token === "string" && parsed.currentSession.access_token) return parsed.currentSession.access_token
+                    if (typeof parsed?.session?.access_token === "string" && parsed.session.access_token) return parsed.session.access_token
+                    if (Array.isArray(parsed) && typeof parsed[0]?.access_token === "string" && parsed[0].access_token) return parsed[0].access_token
+                    return null
+                }
+
                 for (let i = 0; i < localStorage.length; i++) {
                     const key = localStorage.key(i)
                     if (!key || !key.startsWith("sb-") || !key.endsWith("-auth-token")) continue
@@ -104,8 +114,8 @@ export function useCurrentUser() {
                     if (!raw) continue
                     try {
                         const parsed = JSON.parse(raw)
-                        if (typeof parsed?.access_token === "string" && parsed.access_token) return parsed.access_token
-                        if (Array.isArray(parsed) && parsed[0]?.access_token) return parsed[0].access_token
+                        const token = extractToken(parsed)
+                        if (token) return token
                     } catch {
                         // ignore
                     }
