@@ -289,7 +289,7 @@ export function GhostRow<TData>({ table, onInsert }: GhostRowProps<TData>) {
         }
 
         // Role: laboratorio_tipificador - Can edit everything EXCEPT cotizacion_lab, autorizacion_lab
-        if (userRole === 'laboratorio_tipificador' || (userRole.includes('laboratorio') && userRole.includes('tipificador'))) {
+        if (userRole === 'laboratorio_tipificador' || userRole.includes('tipificador')) {
             const blockedColumns = ['cotizacion_lab', 'autorizacion_lab']
             if (blockedColumns.includes(columnId)) return false
             return true
@@ -390,3 +390,4 @@ export function GhostRow<TData>({ table, onInsert }: GhostRowProps<TData>) {
         </tr>
     )
 }
+

@@ -30,7 +30,8 @@ export function DatagridEditor() {
         'administrativo': 'ADMIN',
         'vendor': 'COM',
         'laboratorio_lector': 'LAB',
-        'laboratorio_tipificador': 'LAB'
+        'laboratorio_tipificador': 'LAB',
+        'oficina_tecnica_humedad_tipificador': 'LAB'
     }
 
     const [viewMode, setViewMode] = React.useState<"LAB" | "COM" | "ADMIN">(() => {

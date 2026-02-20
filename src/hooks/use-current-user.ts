@@ -37,7 +37,8 @@ export function useCurrentUser() {
             'vendedor': ['LAB', 'COM'],
             'comercial': ['LAB', 'COM'],
             'laboratorio_lector': ['LAB'],
-            'laboratorio_tipificador': ['LAB']
+            'laboratorio_tipificador': ['LAB'],
+            'oficina_tecnica_humedad_tipificador': ['LAB']
         }
 
         // Use exact match first
@@ -49,7 +50,7 @@ export function useCurrentUser() {
         if (rNorm === 'admin' || qIsAdmin) return ['LAB', 'COM', 'ADMIN']
         if (rNorm.includes('comercial') || rNorm.includes('vendor') || rNorm.includes('vendedor') || rNorm.includes('asesor')) return ['LAB', 'COM']
         if (rNorm.includes('administrativo')) return ['LAB', 'ADMIN']
-        if (rNorm.includes('laboratorio')) return ['LAB']
+        if (rNorm.includes('laboratorio') || rNorm.includes('tipificador')) return ['LAB']
 
         // Default: wait for DB permissions (show only the requested mode)
         const qMode = searchParams.get("mode")?.toUpperCase()
@@ -64,16 +65,17 @@ export function useCurrentUser() {
         const rNorm = (qRole || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
         const isSuperAdmin = rNorm === 'admin' || qIsAdmin
         const dynamicCanWrite = qCanWrite || isSuperAdmin
+        const isLabRole = (rNorm.includes('laboratorio') || rNorm.includes('tipificador')) && !rNorm.includes('lector')
 
         return {
             laboratorio: {
                 read: true, // Everyone with access to Programacion can read Lab (at least read-only)
-                write: dynamicCanWrite && (isSuperAdmin || rNorm.includes('laboratorio')),
+                write: dynamicCanWrite && (isSuperAdmin || isLabRole),
                 delete: false
             },
             programacion: {
                 read: true,
-                write: dynamicCanWrite && (isSuperAdmin || rNorm.includes('laboratorio')),
+                write: dynamicCanWrite && (isSuperAdmin || isLabRole),
                 delete: false
             },
             comercial: {
@@ -253,8 +255,8 @@ export function useCurrentUser() {
 
             // Logic shared with EditableCell: block write if viewing LAB as non-lab staff
             if (mode === "LAB") {
-                const isLabStaff = rNorm.includes('laboratorio')
-                if (!isLabStaff) return false
+                const isLabReadOnly = rNorm.includes('lector')
+                if (isLabReadOnly) return false
                 return qCanWrite || permissions?.laboratorio?.write || permissions?.programacion?.write || false
             }
 
