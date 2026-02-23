@@ -18,6 +18,13 @@ export function useCurrentUser() {
     const qCanWrite = searchParams.get("canWrite") === "true"
     const qIsAdmin = searchParams.get("isAdmin") === "true"
     const passedToken = searchParams.get("token")
+    const requestedModeParam = (searchParams.get("mode") || "").toLowerCase()
+    const requestedMode: ViewMode =
+        requestedModeParam === "comercial" || requestedModeParam === "com"
+            ? "COM"
+            : requestedModeParam === "admin"
+                ? "ADMIN"
+                : "LAB"
 
     const [role, setRole] = useState<string | null>(qRole)
     const [loading, setLoading] = useState(true)
@@ -25,39 +32,7 @@ export function useCurrentUser() {
     const [needsAuth, setNeedsAuth] = useState(false)
     const [tokenApplied, setTokenApplied] = useState(false)
 
-    const [allowedViews, setAllowedViews] = useState<ViewMode[]>(() => {
-        // Role-based mapping for known roles (before DB load)
-        const rNorm = (qRole || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-
-        // Map role_ids to their expected views
-        const roleViewMap: Record<string, ViewMode[]> = {
-            'admin': ['LAB', 'COM', 'ADMIN'],
-            'administrativo': ['LAB', 'ADMIN'],
-            'vendor': ['LAB', 'COM'],
-            'vendedor': ['LAB', 'COM'],
-            'comercial': ['LAB', 'COM'],
-            'laboratorio_lector': ['LAB'],
-            'laboratorio_tipificador': ['LAB'],
-            'oficina_tecnica_humedad_tipificador': ['LAB']
-        }
-
-        // Use exact match first
-        if (roleViewMap[rNorm]) {
-            return roleViewMap[rNorm]
-        }
-
-        // Heuristic fallback for unknown roles
-        if (rNorm === 'admin' || qIsAdmin) return ['LAB', 'COM', 'ADMIN']
-        if (rNorm.includes('comercial') || rNorm.includes('vendor') || rNorm.includes('vendedor') || rNorm.includes('asesor')) return ['LAB', 'COM']
-        if (rNorm.includes('administrativo')) return ['LAB', 'ADMIN']
-        if (rNorm.includes('laboratorio') || rNorm.includes('tipificador')) return ['LAB']
-
-        // Default: wait for DB permissions (show only the requested mode)
-        const qMode = searchParams.get("mode")?.toUpperCase()
-        if (qMode === "COMERCIAL" || qMode === "COM") return ['COM']
-        if (qMode === "ADMIN") return ['ADMIN']
-        return ['LAB']  // Ultimate fallback
-    })
+    const [allowedViews, setAllowedViews] = useState<ViewMode[]>(["LAB", "COM", "ADMIN"])
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [permissions, setPermissions] = useState<any>(() => {
@@ -194,40 +169,36 @@ export function useCurrentUser() {
 
                     const dbPerms = roleDef?.permissions
                     if (dbPerms && Object.keys(dbPerms).length > 0) {
-                        setPermissions(dbPerms)
-
-                        // Build allowed views strictly from database permissions
-                        const dbViews: ViewMode[] = []
-                        if (dbPerms.laboratorio?.read || dbPerms.programacion?.read) dbViews.push("LAB")
-                        if (dbPerms.comercial?.read) dbViews.push("COM")
-                        if (dbPerms.administracion?.read) dbViews.push("ADMIN")
-
-                        // Special case: Ensure Administrativo and Vendor always have LAB access
-                        const dbRoleNorm = (dbRole || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-                        const isVendor = dbRoleNorm.includes('vendedor') || dbRoleNorm.includes('comercial') || dbRoleNorm.includes('vendor') || dbRoleNorm.includes('asesor')
-                        const isAdminRole = dbRoleNorm.includes('administrativo')
-
-                        if (isVendor) {
-                            dbViews.push("LAB")
-                            dbViews.push("COM")
+                        const normalizedPerms = {
+                            ...dbPerms,
+                            programacion: {
+                                read: true,
+                                write: dbPerms.programacion?.write || false,
+                                delete: dbPerms.programacion?.delete || false
+                            },
+                            laboratorio: {
+                                read: true,
+                                write: dbPerms.laboratorio?.write || false,
+                                delete: dbPerms.laboratorio?.delete || false
+                            },
+                            comercial: {
+                                read: true,
+                                write: dbPerms.comercial?.write || false,
+                                delete: dbPerms.comercial?.delete || false
+                            },
+                            administracion: {
+                                read: true,
+                                write: dbPerms.administracion?.write || false,
+                                delete: dbPerms.administracion?.delete || false
+                            }
                         }
-                        if (isAdminRole) {
-                            dbViews.push("LAB")
-                            dbViews.push("ADMIN")
-                        }
 
-                        // Special case: Only 'admin' (superadmin) gets all views unconditionally
-                        const isSuperAdmin = dbRoleNorm === "admin"
-
-                        if (isSuperAdmin) {
-                            setAllowedViews(["LAB", "COM", "ADMIN"])
-                        } else {
-                            setAllowedViews([...new Set(dbViews)] as ViewMode[])
-                        }
+                        setPermissions(normalizedPerms)
+                        setAllowedViews(["LAB", "COM", "ADMIN"])
                     }
 
                 }
-            } catch (_) {
+            } catch {
                 // Fallback
             } finally {
                 setLoading(false)
@@ -249,6 +220,7 @@ export function useCurrentUser() {
         getCanWrite: (mode: ViewMode) => {
             const rNorm = (role || qRole || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
             const isSuperAdmin = rNorm === 'admin' || qIsAdmin
+            const canWriteFromRequestedMode = qCanWrite && mode === requestedMode
 
             // Priority 1: Superadmin always has access
             if (isSuperAdmin) return true
@@ -257,17 +229,14 @@ export function useCurrentUser() {
             if (mode === "LAB") {
                 const isLabReadOnly = rNorm.includes('lector')
                 if (isLabReadOnly) return false
-                return qCanWrite || permissions?.laboratorio?.write || permissions?.programacion?.write || false
+                return canWriteFromRequestedMode || permissions?.laboratorio?.write || permissions?.programacion?.write || false
             }
-
-            // Priority 3: Default behavior for other views
-            if (qCanWrite) return true
 
             if (mode === "COM") {
-                return permissions?.comercial?.write || false
+                return canWriteFromRequestedMode || permissions?.comercial?.write || false
             }
             if (mode === "ADMIN") {
-                return permissions?.administracion?.write || false
+                return canWriteFromRequestedMode || permissions?.administracion?.write || false
             }
             return false
         }
