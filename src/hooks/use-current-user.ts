@@ -16,6 +16,7 @@ export function useCurrentUser() {
     const qUserId = searchParams.get("userId")
     const qRole = searchParams.get("role")?.toLowerCase() || null
     const qCanWrite = searchParams.get("canWrite") === "true"
+    const hasCanWriteParam = searchParams.has("canWrite")
     const qIsAdmin = searchParams.get("isAdmin") === "true"
     const passedToken = searchParams.get("token")
     const requestedModeParam = (searchParams.get("mode") || "").toLowerCase()
@@ -220,23 +221,28 @@ export function useCurrentUser() {
         getCanWrite: (mode: ViewMode) => {
             const rNorm = (role || qRole || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
             const isSuperAdmin = rNorm === 'admin' || qIsAdmin
-            const canWriteFromRequestedMode = qCanWrite && mode === requestedMode
 
             // Priority 1: Superadmin always has access
             if (isSuperAdmin) return true
+
+            // Parent shell is the authority for the initially requested mode.
+            // If it sends canWrite=false, keep strict read-only in that view.
+            if (mode === requestedMode && hasCanWriteParam) {
+                return qCanWrite
+            }
 
             // Logic shared with EditableCell: block write if viewing LAB as non-lab staff
             if (mode === "LAB") {
                 const isLabReadOnly = rNorm.includes('lector')
                 if (isLabReadOnly) return false
-                return canWriteFromRequestedMode || permissions?.laboratorio?.write || permissions?.programacion?.write || false
+                return permissions?.laboratorio?.write || permissions?.programacion?.write || false
             }
 
             if (mode === "COM") {
-                return canWriteFromRequestedMode || permissions?.comercial?.write || false
+                return permissions?.comercial?.write || false
             }
             if (mode === "ADMIN") {
-                return canWriteFromRequestedMode || permissions?.administracion?.write || false
+                return permissions?.administracion?.write || false
             }
             return false
         }
