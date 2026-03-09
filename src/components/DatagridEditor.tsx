@@ -29,6 +29,7 @@ export function DatagridEditor() {
         'admin': 'ADMIN',
         'administrativo': 'ADMIN',
         'vendor': 'COM',
+        'auxiliar_comercial': 'COM',
         'laboratorio_lector': 'LAB',
         'laboratorio_tipificador': 'LAB',
         'oficina_tecnica_humedad_tipificador': 'LAB'

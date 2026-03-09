@@ -169,7 +169,6 @@ export function useCurrentUser() {
                         : (profile as any).role_definitions
 
                     const dbPerms = roleDef?.permissions
-                    const normalizedEmail = String((profile as any).email || "").toLowerCase().trim()
                     if (dbPerms && Object.keys(dbPerms).length > 0) {
                         const normalizedPerms = {
                             ...dbPerms,
@@ -192,21 +191,6 @@ export function useCurrentUser() {
                                 read: true,
                                 write: dbPerms.administracion?.write || false,
                                 delete: dbPerms.administracion?.delete || false
-                            }
-                        }
-
-                        // User-specific policy:
-                        // asesorcomercial1 edits COMERCIAL and has ADMIN read-only.
-                        if (normalizedEmail === "asesorcomercial1@geofal.com.pe") {
-                            normalizedPerms.comercial = {
-                                read: true,
-                                write: true,
-                                delete: false
-                            }
-                            normalizedPerms.administracion = {
-                                read: true,
-                                write: false,
-                                delete: false
                             }
                         }
 
