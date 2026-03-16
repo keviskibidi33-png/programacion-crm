@@ -5,6 +5,58 @@ import { useSearchParams } from "next/navigation"
 
 export type ViewMode = "LAB" | "COM" | "ADMIN"
 
+type ModulePermission = {
+    read?: boolean
+    write?: boolean
+    delete?: boolean
+}
+
+type PermissionMap = Record<string, ModulePermission>
+
+type SessionTokenPayload = {
+    access_token?: string
+    currentSession?: { access_token?: string | null } | null
+    session?: { access_token?: string | null } | null
+}
+
+type RoleDefinitionRecord = {
+    permissions?: PermissionMap | null
+}
+
+type ProfileRecord = {
+    role: string | null
+    email: string | null
+    role_definitions: RoleDefinitionRecord | RoleDefinitionRecord[] | null
+}
+
+const CONTROL_ACCESS_REVOKED_EMAILS = new Set([
+    "tecnico2@geofal.com.pe",
+    "tecnico3@geofal.com.pe",
+])
+
+function applyRestrictedControlAccess(email: string | null | undefined, perms: PermissionMap): PermissionMap {
+    const normalizedEmail = String(email || "").toLowerCase().trim()
+    if (!CONTROL_ACCESS_REVOKED_EMAILS.has(normalizedEmail)) {
+        return perms
+    }
+
+    return {
+        ...perms,
+        laboratorio: { read: false, write: false, delete: false },
+        comercial: { read: false, write: false, delete: false },
+    }
+}
+
+function getAllowedViewsFromPermissions(perms: PermissionMap | null | undefined): ViewMode[] {
+    const views: ViewMode[] = []
+
+    if (perms?.laboratorio?.read === true) views.push("LAB")
+    if (perms?.comercial?.read === true) views.push("COM")
+    if (perms?.administracion?.read === true) views.push("ADMIN")
+
+    return views
+}
+
 export function useCurrentUser() {
     const supabase = useMemo(() => createClient(), [])
     const searchParams = useSearchParams()
@@ -35,8 +87,7 @@ export function useCurrentUser() {
 
     const [allowedViews, setAllowedViews] = useState<ViewMode[]>(["LAB", "COM", "ADMIN"])
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const [permissions, setPermissions] = useState<any>(() => {
+    const [permissions, setPermissions] = useState<PermissionMap>(() => {
         // Initial permissions: minimal until DB load completes
         const rNorm = (qRole || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
         const isSuperAdmin = rNorm === 'admin' || qIsAdmin
@@ -76,12 +127,24 @@ export function useCurrentUser() {
                 const direct = localStorage.getItem("programacion_access_token") || localStorage.getItem("token")
                 if (direct) return direct
 
-                const extractToken = (parsed: any): string | null => {
+                const extractToken = (parsed: unknown): string | null => {
                     if (!parsed) return null
-                    if (typeof parsed?.access_token === "string" && parsed.access_token) return parsed.access_token
-                    if (typeof parsed?.currentSession?.access_token === "string" && parsed.currentSession.access_token) return parsed.currentSession.access_token
-                    if (typeof parsed?.session?.access_token === "string" && parsed.session.access_token) return parsed.session.access_token
-                    if (Array.isArray(parsed) && typeof parsed[0]?.access_token === "string" && parsed[0].access_token) return parsed[0].access_token
+                    if (Array.isArray(parsed)) {
+                        const first = parsed[0] as SessionTokenPayload | undefined
+                        if (typeof first?.access_token === "string" && first.access_token) return first.access_token
+                        return null
+                    }
+
+                    if (typeof parsed !== "object") return null
+
+                    const tokenPayload = parsed as SessionTokenPayload
+                    if (typeof tokenPayload.access_token === "string" && tokenPayload.access_token) return tokenPayload.access_token
+                    if (typeof tokenPayload.currentSession?.access_token === "string" && tokenPayload.currentSession.access_token) {
+                        return tokenPayload.currentSession.access_token
+                    }
+                    if (typeof tokenPayload.session?.access_token === "string" && tokenPayload.session.access_token) {
+                        return tokenPayload.session.access_token
+                    }
                     return null
                 }
 
@@ -158,15 +221,13 @@ export function useCurrentUser() {
                 }
 
                 if (profile) {
-                    const dbRole = (profile as any).role?.toLowerCase()
+                    const typedProfile = profile as ProfileRecord
+                    const dbRole = typedProfile.role?.toLowerCase()
                     if (!sourceOfTruthIsUrl) setRole(dbRole)
 
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    const roleDef = Array.isArray((profile as any).role_definitions)
-                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                        ? (profile as any).role_definitions[0]
-                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                        : (profile as any).role_definitions
+                    const roleDef = Array.isArray(typedProfile.role_definitions)
+                        ? typedProfile.role_definitions[0]
+                        : typedProfile.role_definitions
 
                     const dbPerms = roleDef?.permissions
                     if (dbPerms && Object.keys(dbPerms).length > 0) {
@@ -194,8 +255,10 @@ export function useCurrentUser() {
                             }
                         }
 
-                        setPermissions(normalizedPerms)
-                        setAllowedViews(["LAB", "COM", "ADMIN"])
+                        const effectivePerms = applyRestrictedControlAccess(typedProfile.email, normalizedPerms)
+
+                        setPermissions(effectivePerms)
+                        setAllowedViews(getAllowedViewsFromPermissions(effectivePerms))
                     }
 
                 }
