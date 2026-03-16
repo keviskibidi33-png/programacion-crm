@@ -44,6 +44,7 @@ function applyRestrictedControlAccess(email: string | null | undefined, perms: P
         ...perms,
         laboratorio: { read: false, write: false, delete: false },
         comercial: { read: false, write: false, delete: false },
+        administracion: { read: false, write: false, delete: false },
     }
 }
 
