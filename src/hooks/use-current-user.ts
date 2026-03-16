@@ -223,7 +223,7 @@ export function useCurrentUser() {
 
                 if (profile) {
                     const typedProfile = profile as ProfileRecord
-                    const dbRole = typedProfile.role?.toLowerCase()
+                    const dbRole = typeof typedProfile.role === "string" ? typedProfile.role.toLowerCase() : null
                     if (!sourceOfTruthIsUrl) setRole(dbRole)
 
                     const roleDef = Array.isArray(typedProfile.role_definitions)
