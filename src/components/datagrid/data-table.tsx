@@ -39,6 +39,7 @@ type PersistedTableState = {
     statusFilter: string
     authorizationFilter: string
     paymentFilter: string
+    scrollOffset: number
 }
 
 const DEFAULT_PAGINATION = {
@@ -69,6 +70,7 @@ function readPersistedTableState(storageKey?: string): PersistedTableState | nul
             statusFilter: typeof parsed.statusFilter === "string" ? parsed.statusFilter : "TODOS",
             authorizationFilter: typeof parsed.authorizationFilter === "string" ? parsed.authorizationFilter : "TODOS",
             paymentFilter: typeof parsed.paymentFilter === "string" ? parsed.paymentFilter : "TODOS",
+            scrollOffset: typeof parsed.scrollOffset === "number" ? parsed.scrollOffset : 0,
         }
     } catch {
         return null
@@ -127,6 +129,8 @@ export function DataTable<TData, TValue>({
     const [statusFilter, setStatusFilter] = React.useState(() => persistedState?.statusFilter ?? "TODOS")
     const [authorizationFilter, setAuthorizationFilter] = React.useState(() => persistedState?.authorizationFilter ?? "TODOS")
     const [paymentFilter, setPaymentFilter] = React.useState(() => persistedState?.paymentFilter ?? "TODOS")
+    const [scrollOffset, setScrollOffset] = React.useState(() => persistedState?.scrollOffset ?? 0)
+    const hasRestoredScrollRef = React.useRef(false)
 
     // Pagination for High Volume: Default 500
     const [pagination, setPagination] = React.useState(() => persistedState?.pagination ?? DEFAULT_PAGINATION)
@@ -196,6 +200,7 @@ export function DataTable<TData, TValue>({
                     statusFilter,
                     authorizationFilter,
                     paymentFilter,
+                    scrollOffset,
                 } satisfies PersistedTableState),
             )
         } catch {
@@ -209,6 +214,7 @@ export function DataTable<TData, TValue>({
         globalFilter,
         pagination,
         paymentFilter,
+        scrollOffset,
         sorting,
         statusFilter,
         storageKey,
@@ -224,6 +230,55 @@ export function DataTable<TData, TValue>({
         estimateSize: () => 40, // Base row height
         overscan: 20, // Buffer rows
     })
+
+    React.useEffect(() => {
+        const scrollContainer = tableContainerRef.current
+        if (!scrollContainer) return
+
+        let timeoutId: ReturnType<typeof setTimeout> | null = null
+
+        const handleScroll = () => {
+            const nextOffset = scrollContainer.scrollTop
+            if (timeoutId) {
+                clearTimeout(timeoutId)
+            }
+
+            timeoutId = setTimeout(() => {
+                setScrollOffset((previousOffset) => {
+                    if (Math.abs(previousOffset - nextOffset) < 4) {
+                        return previousOffset
+                    }
+                    return nextOffset
+                })
+            }, 120)
+        }
+
+        scrollContainer.addEventListener("scroll", handleScroll, { passive: true })
+
+        return () => {
+            scrollContainer.removeEventListener("scroll", handleScroll)
+            if (timeoutId) {
+                clearTimeout(timeoutId)
+            }
+        }
+    }, [])
+
+    React.useEffect(() => {
+        if (hasRestoredScrollRef.current) return
+        if (rows.length === 0) return
+
+        const scrollContainer = tableContainerRef.current
+        if (!scrollContainer) return
+
+        hasRestoredScrollRef.current = true
+        if (scrollOffset <= 0) return
+
+        const frameId = window.requestAnimationFrame(() => {
+            scrollContainer.scrollTop = scrollOffset
+        })
+
+        return () => window.cancelAnimationFrame(frameId)
+    }, [rows.length, scrollOffset])
 
     // Notify parent about filtered items
     React.useEffect(() => {
