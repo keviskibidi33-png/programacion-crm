@@ -12,10 +12,63 @@ import { RefreshCw, Wifi, WifiOff, FileDown, Info, Lock } from "lucide-react"
 import { LoginButton } from "@/components/login-button"
 import { useCurrentUser } from "@/hooks/use-current-user"
 
+type ViewMode = "LAB" | "COM" | "ADMIN"
+
+const PROGRAMACION_VIEW_STORAGE_PREFIX = "programacion:last-view:v1"
+const PROGRAMACION_TABLE_STORAGE_PREFIX = "programacion:table-state:v1"
+
+const roleToViewMap: Record<string, ViewMode> = {
+    admin: "ADMIN",
+    administrativo: "ADMIN",
+    vendor: "COM",
+    auxiliar_comercial: "COM",
+    laboratorio_lector: "LAB",
+    laboratorio_tipificador: "LAB",
+    oficina_tecnica_humedad_tipificador: "LAB",
+}
+
+function normalizeModeParam(modeParam: string | null): ViewMode | null {
+    if (modeParam === "comercial" || modeParam === "com") return "COM"
+    if (modeParam === "admin" || modeParam === "administracion") return "ADMIN"
+    if (modeParam === "lab" || modeParam === "laboratorio") return "LAB"
+    return null
+}
+
+function inferViewFromRole(roleParam: string): ViewMode {
+    const normalizedRole = roleParam.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+
+    if (roleToViewMap[normalizedRole]) {
+        return roleToViewMap[normalizedRole]
+    }
+
+    if (normalizedRole.includes("admin") || normalizedRole.includes("geren") || normalizedRole.includes("direc") || normalizedRole.includes("jefe")) {
+        return "ADMIN"
+    }
+    if (normalizedRole.includes("comercial") || normalizedRole.includes("vendedor") || normalizedRole.includes("asesor") || normalizedRole.includes("vendor") || normalizedRole.includes("ventas")) {
+        return "COM"
+    }
+    return "LAB"
+}
+
+function readStoredView(identity: string): ViewMode | null {
+    if (typeof window === "undefined") return null
+
+    try {
+        const rawValue = window.localStorage.getItem(`${PROGRAMACION_VIEW_STORAGE_PREFIX}:${identity}`)
+        if (rawValue === "LAB" || rawValue === "COM" || rawValue === "ADMIN") {
+            return rawValue
+        }
+    } catch {
+        // Ignore localStorage read errors and continue with defaults.
+    }
+
+    return null
+}
+
 export function DatagridEditor() {
     const searchParams = useSearchParams()
     const modeParam = searchParams.get('mode')
-    const { loading: authLoading, role, allowedViews, getCanView, getCanWrite, needsAuth, permissions } = useCurrentUser()
+    const { loading: authLoading, userId, role, allowedViews, getCanView, getCanWrite, needsAuth, permissions } = useCurrentUser()
     const { data, isLoading, realtimeStatus, updateField, insertRow, exportToExcel } = useProgramacionData()
 
     // State to track filtered data for Excel export
@@ -23,56 +76,36 @@ export function DatagridEditor() {
 
     // Initialize state based on URL param, with role-based fallback
     const roleParam = searchParams.get('role') || ''
+    const explicitMode = React.useMemo(() => normalizeModeParam(modeParam), [modeParam])
+    const storageIdentity = React.useMemo(
+        () => userId || roleParam || role || "anonymous",
+        [role, roleParam, userId],
+    )
+    const hasRestoredStoredViewRef = React.useRef<string | null>(null)
 
-    // Map role_ids directly to views (based on database values)
-    const roleToViewMap: Record<string, "LAB" | "COM" | "ADMIN"> = {
-        'admin': 'ADMIN',
-        'administrativo': 'ADMIN',
-        'vendor': 'COM',
-        'auxiliar_comercial': 'COM',
-        'laboratorio_lector': 'LAB',
-        'laboratorio_tipificador': 'LAB',
-        'oficina_tecnica_humedad_tipificador': 'LAB'
-    }
-
-    const [viewMode, setViewMode] = React.useState<"LAB" | "COM" | "ADMIN">(() => {
-        // First priority: explicit mode in URL
-        if (modeParam === 'comercial' || modeParam === 'com') {
-            return 'COM'
-        }
-        if (modeParam === 'admin') {
-            return 'ADMIN'
-        }
-        if (modeParam === 'lab' || modeParam === 'laboratorio') {
-            return 'LAB'
-        }
-
-        // Fallback: detect from role parameter using exact match
-        const rNorm = roleParam.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-
-        if (roleToViewMap[rNorm]) {
-            return roleToViewMap[rNorm]
-        }
-
-        // Pattern matching fallback
-        if (rNorm.includes('admin') || rNorm.includes('geren') || rNorm.includes('direc') || rNorm.includes('jefe')) {
-            return 'ADMIN'
-        }
-        if (rNorm.includes('comercial') || rNorm.includes('vendedor') || rNorm.includes('asesor') || rNorm.includes('vendor') || rNorm.includes('ventas')) {
-            return 'COM'
-        }
-        return 'LAB'
-    })
+    const [viewMode, setViewMode] = React.useState<ViewMode>(() => explicitMode ?? inferViewFromRole(roleParam))
 
 
     const canWrite = React.useMemo(() => getCanWrite(viewMode), [viewMode, getCanWrite])
 
-    // Reactive sync with URL param (handles case where useState init misses it)
+    // URL mode always wins over local persistence.
     React.useEffect(() => {
-        if (modeParam === 'comercial' || modeParam === 'com') setViewMode('COM')
-        else if (modeParam === 'admin') setViewMode('ADMIN')
-        else if (modeParam === 'laboratorio' || modeParam === 'lab') setViewMode('LAB')
-    }, [modeParam])
+        if (explicitMode) {
+            setViewMode(explicitMode)
+        }
+    }, [explicitMode])
+
+    // Restore the user's last view when there is no explicit URL override.
+    React.useEffect(() => {
+        if (authLoading || explicitMode || !storageIdentity) return
+        if (hasRestoredStoredViewRef.current === storageIdentity) return
+
+        hasRestoredStoredViewRef.current = storageIdentity
+        const storedView = readStoredView(storageIdentity)
+        if (storedView) {
+            setViewMode(storedView)
+        }
+    }, [authLoading, explicitMode, storageIdentity])
 
 
     // Enforce Permissions Logic: Sync view mode with allowed views
@@ -91,12 +124,33 @@ export function DatagridEditor() {
         }
     }, [authLoading, needsAuth, allowedViews, viewMode, role])
 
+    React.useEffect(() => {
+        if (authLoading || needsAuth || explicitMode || !storageIdentity) return
+        if (typeof window === "undefined") return
+
+        const normalizedRole = (role || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+        const isHighLevel = normalizedRole.includes("admin") || normalizedRole.includes("geren") || normalizedRole.includes("administra") || normalizedRole.includes("direc") || normalizedRole.includes("jefe")
+
+        if (!isHighLevel && allowedViews.length > 0 && !allowedViews.includes(viewMode)) return
+
+        try {
+            window.localStorage.setItem(`${PROGRAMACION_VIEW_STORAGE_PREFIX}:${storageIdentity}`, viewMode)
+        } catch {
+            // Ignore localStorage write errors to avoid blocking the UI.
+        }
+    }, [allowedViews, authLoading, explicitMode, needsAuth, role, storageIdentity, viewMode])
+
     // Determine which columns to show based on view mode
     const currentColumns = React.useMemo(() => {
         if (viewMode === 'COM') return columnsComercial
         if (viewMode === 'ADMIN') return columnsAdmin
         return columnsLab
     }, [viewMode])
+
+    const tableStateStorageKey = React.useMemo(
+        () => `${PROGRAMACION_TABLE_STORAGE_PREFIX}:${storageIdentity}:${viewMode}`,
+        [storageIdentity, viewMode],
+    )
 
     // 1. Loading State
     if (authLoading) {
@@ -229,7 +283,8 @@ export function DatagridEditor() {
                     permissions={permissions}
                     viewMode={viewMode}
                     onFilteredDataChange={setFilteredItems}
-                    key={viewMode} // Force remount on view change to reset table state
+                    storageKey={tableStateStorageKey}
+                    key={`${storageIdentity}:${viewMode}`} // Reset table internals only when user/view changes.
                 />
             </div>
         </div>

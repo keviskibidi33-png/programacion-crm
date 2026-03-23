@@ -26,6 +26,55 @@ import {
 } from "lucide-react"
 import { GhostRow } from "./ghost-row"
 
+type PersistedTableState = {
+    sorting: SortingState
+    columnFilters: ColumnFiltersState
+    columnVisibility: VisibilityState
+    globalFilter: string
+    pagination: {
+        pageIndex: number
+        pageSize: number
+    }
+    deliveryDateFilter: string
+    statusFilter: string
+    authorizationFilter: string
+    paymentFilter: string
+}
+
+const DEFAULT_PAGINATION = {
+    pageIndex: 0,
+    pageSize: 500,
+}
+
+function readPersistedTableState(storageKey?: string): PersistedTableState | null {
+    if (!storageKey || typeof window === "undefined") return null
+
+    try {
+        const rawValue = window.localStorage.getItem(storageKey)
+        if (!rawValue) return null
+
+        const parsed = JSON.parse(rawValue) as Partial<PersistedTableState>
+        return {
+            sorting: Array.isArray(parsed.sorting) ? parsed.sorting : [],
+            columnFilters: Array.isArray(parsed.columnFilters) ? parsed.columnFilters : [],
+            columnVisibility: parsed.columnVisibility && typeof parsed.columnVisibility === "object" ? parsed.columnVisibility : {},
+            globalFilter: typeof parsed.globalFilter === "string" ? parsed.globalFilter : "",
+            pagination: parsed.pagination && typeof parsed.pagination === "object"
+                ? {
+                    pageIndex: typeof parsed.pagination.pageIndex === "number" ? parsed.pagination.pageIndex : DEFAULT_PAGINATION.pageIndex,
+                    pageSize: typeof parsed.pagination.pageSize === "number" ? parsed.pagination.pageSize : DEFAULT_PAGINATION.pageSize,
+                }
+                : DEFAULT_PAGINATION,
+            deliveryDateFilter: typeof parsed.deliveryDateFilter === "string" ? parsed.deliveryDateFilter : "",
+            statusFilter: typeof parsed.statusFilter === "string" ? parsed.statusFilter : "TODOS",
+            authorizationFilter: typeof parsed.authorizationFilter === "string" ? parsed.authorizationFilter : "TODOS",
+            paymentFilter: typeof parsed.paymentFilter === "string" ? parsed.paymentFilter : "TODOS",
+        }
+    } catch {
+        return null
+    }
+}
+
 // Extend TableMeta to include our custom properties
 declare module '@tanstack/react-table' {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -51,6 +100,7 @@ interface DataTableProps<TData, TValue> {
     permissions?: any
     viewMode?: string
     onFilteredDataChange?: (data: TData[]) => void
+    storageKey?: string
 }
 
 export function DataTable<TData, TValue>({
@@ -63,18 +113,23 @@ export function DataTable<TData, TValue>({
     canWrite,
     permissions,
     viewMode,
-    onFilteredDataChange
+    onFilteredDataChange,
+    storageKey
 }: DataTableProps<TData, TValue>) {
-    const [sorting, setSorting] = React.useState<SortingState>([])
-    const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
-    const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({})
-    const [globalFilter, setGlobalFilter] = React.useState("")
+    const persistedStateRef = React.useRef<PersistedTableState | null>(readPersistedTableState(storageKey))
+    const persistedState = persistedStateRef.current
+
+    const [sorting, setSorting] = React.useState<SortingState>(() => persistedState?.sorting ?? [])
+    const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(() => persistedState?.columnFilters ?? [])
+    const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>(() => persistedState?.columnVisibility ?? {})
+    const [globalFilter, setGlobalFilter] = React.useState(() => persistedState?.globalFilter ?? "")
+    const [deliveryDateFilter, setDeliveryDateFilter] = React.useState(() => persistedState?.deliveryDateFilter ?? "")
+    const [statusFilter, setStatusFilter] = React.useState(() => persistedState?.statusFilter ?? "TODOS")
+    const [authorizationFilter, setAuthorizationFilter] = React.useState(() => persistedState?.authorizationFilter ?? "TODOS")
+    const [paymentFilter, setPaymentFilter] = React.useState(() => persistedState?.paymentFilter ?? "TODOS")
 
     // Pagination for High Volume: Default 500
-    const [pagination, setPagination] = React.useState({
-        pageIndex: 0,
-        pageSize: 500,
-    })
+    const [pagination, setPagination] = React.useState(() => persistedState?.pagination ?? DEFAULT_PAGINATION)
 
     // eslint-disable-next-line react-hooks/incompatible-library
     const table = useReactTable({
@@ -125,6 +180,40 @@ export function DataTable<TData, TValue>({
         },
     })
 
+    React.useEffect(() => {
+        if (!storageKey || typeof window === "undefined") return
+
+        try {
+            window.localStorage.setItem(
+                storageKey,
+                JSON.stringify({
+                    sorting,
+                    columnFilters,
+                    columnVisibility,
+                    globalFilter,
+                    pagination,
+                    deliveryDateFilter,
+                    statusFilter,
+                    authorizationFilter,
+                    paymentFilter,
+                } satisfies PersistedTableState),
+            )
+        } catch {
+            // Ignore localStorage write errors to avoid breaking table interaction.
+        }
+    }, [
+        authorizationFilter,
+        columnFilters,
+        columnVisibility,
+        deliveryDateFilter,
+        globalFilter,
+        pagination,
+        paymentFilter,
+        sorting,
+        statusFilter,
+        storageKey,
+    ])
+
     // --- Virtualization ---
     const tableContainerRef = useRef<HTMLDivElement>(null)
     const { rows } = table.getRowModel()
@@ -160,9 +249,11 @@ export function DataTable<TData, TValue>({
                     {(table.getAllColumns().find(c => c.id === "fecha_entrega_estimada") || table.getAllColumns().find(c => c.id === "fecha_entrega_com")) && (
                         <input
                             type="date"
+                            value={deliveryDateFilter}
                             className="h-8 border border-zinc-200 rounded-md px-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white text-zinc-900 cursor-pointer hover:bg-zinc-50"
                             onChange={e => {
                                 const val = e.target.value
+                                setDeliveryDateFilter(val)
                                 // Try to filter both potential date columns if they exist
                                 table.getColumn("fecha_entrega_estimada")?.setFilterValue(val)
                                 table.getColumn("fecha_entrega_com")?.setFilterValue(val)
@@ -174,8 +265,13 @@ export function DataTable<TData, TValue>({
                     {/* Status Filter */}
                     {table.getAllColumns().find(c => c.id === "estado_trabajo") && (
                         <select
+                            value={statusFilter}
                             className="h-8 border border-zinc-200 rounded-md px-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white text-zinc-900 cursor-pointer hover:bg-zinc-50"
-                            onChange={e => table.getColumn("estado_trabajo")?.setFilterValue(e.target.value === "TODOS" ? "" : e.target.value)}
+                            onChange={e => {
+                                const nextValue = e.target.value
+                                setStatusFilter(nextValue)
+                                table.getColumn("estado_trabajo")?.setFilterValue(nextValue === "TODOS" ? "" : nextValue)
+                            }}
                         >
                             <option value="TODOS">Estado: Todos</option>
                             <option value="PENDIENTE">Pendiente</option>
@@ -188,8 +284,13 @@ export function DataTable<TData, TValue>({
                     {/* Authorization Filter (Admin/Lab) */}
                     {table.getAllColumns().find(c => c.id === "autorizacion_lab") && (
                         <select
+                            value={authorizationFilter}
                             className="h-8 border border-zinc-200 rounded-md px-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 bg-indigo-50 text-indigo-900 cursor-pointer hover:bg-indigo-100 font-medium"
-                            onChange={e => table.getColumn("autorizacion_lab")?.setFilterValue(e.target.value === "TODOS" ? "" : e.target.value)}
+                            onChange={e => {
+                                const nextValue = e.target.value
+                                setAuthorizationFilter(nextValue)
+                                table.getColumn("autorizacion_lab")?.setFilterValue(nextValue === "TODOS" ? "" : nextValue)
+                            }}
                         >
                             <option value="TODOS">Autorización: Todas</option>
                             <option value="ENTREGADO">Entregar</option>
@@ -200,8 +301,13 @@ export function DataTable<TData, TValue>({
                     {/* Payment Status Filter (Admin) - Using 'envio_informes' as field */}
                     {table.getAllColumns().find(c => c.id === "envio_informes") && (
                         <select
+                            value={paymentFilter}
                             className="h-8 border border-zinc-200 rounded-md px-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 bg-emerald-50 text-emerald-900 cursor-pointer hover:bg-emerald-100 font-medium"
-                            onChange={e => table.getColumn("envio_informes")?.setFilterValue(e.target.value === "TODOS" ? "" : e.target.value)}
+                            onChange={e => {
+                                const nextValue = e.target.value
+                                setPaymentFilter(nextValue)
+                                table.getColumn("envio_informes")?.setFilterValue(nextValue === "TODOS" ? "" : nextValue)
+                            }}
                         >
                             <option value="TODOS">Pago: Todos</option>
                             <option value="PENDIENTE">Pendiente</option>
