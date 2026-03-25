@@ -83,6 +83,7 @@ declare module '@tanstack/react-table' {
     interface TableMeta<TData extends RowData> {
         updateData: (rowId: string, columnId: string, value: unknown) => void
         userRole?: string
+        userEmail?: string
         canWrite?: boolean
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         permissions?: any
@@ -97,6 +98,7 @@ interface DataTableProps<TData, TValue> {
     onUpdate?: (rowId: string, field: string, value: unknown) => void
     onInsert?: (data: Partial<TData>) => Promise<void>
     userRole?: string
+    userEmail?: string
     canWrite?: boolean
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     permissions?: any
@@ -112,6 +114,7 @@ export function DataTable<TData, TValue>({
     onUpdate,
     onInsert,
     userRole,
+    userEmail,
     canWrite,
     permissions,
     viewMode,
@@ -178,6 +181,7 @@ export function DataTable<TData, TValue>({
                 }
             },
             userRole: userRole || '',
+            userEmail: userEmail || '',
             canWrite: canWrite ?? false,
             permissions: permissions || null,
             viewMode: viewMode || ''

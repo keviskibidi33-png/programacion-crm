@@ -81,6 +81,7 @@ export function useCurrentUser() {
                 : "LAB"
 
     const [role, setRole] = useState<string | null>(qRole)
+    const [email, setEmail] = useState<string | null>(null)
     const [loading, setLoading] = useState(true)
     const [userId, setUserId] = useState<string | null>(qUserId)
     const [needsAuth, setNeedsAuth] = useState(false)
@@ -193,6 +194,7 @@ export function useCurrentUser() {
                 if (session) {
                     currentUid = session.user.id
                     setUserId(currentUid)
+                    setEmail(session.user.email?.toLowerCase() || null)
                 } else {
                     // NO USER DETECTED AT ALL
                     setNeedsAuth(true)
@@ -224,7 +226,9 @@ export function useCurrentUser() {
                 if (profile) {
                     const typedProfile = profile as ProfileRecord
                     const dbRole = typeof typedProfile.role === "string" ? typedProfile.role.toLowerCase() : null
+                    const dbEmail = typeof typedProfile.email === "string" ? typedProfile.email.toLowerCase() : null
                     if (!sourceOfTruthIsUrl) setRole(dbRole)
+                    if (dbEmail) setEmail(dbEmail)
 
                     const roleDef = Array.isArray(typedProfile.role_definitions)
                         ? typedProfile.role_definitions[0]
@@ -277,6 +281,7 @@ export function useCurrentUser() {
     return {
         userId,
         role,
+        email,
         loading,
         needsAuth,
         allowedViews,

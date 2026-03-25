@@ -9,6 +9,7 @@ import { StatusSelect } from "./status-select"
 import { AuthorizationSelect } from "./authorization-select"
 import { PaymentSelect } from "./payment-select"
 import { toast } from "sonner"
+import { hasScopedProgramacionColumnAccess, normalizeProgramacionAccessValue } from "@/lib/programacion-column-access"
 
 // Extend meta to support custom cell editing
 declare module "@tanstack/react-table" {
@@ -53,7 +54,7 @@ const EditableCell = React.memo(({ getValue, row: { original }, column: { id }, 
     // --- Column-Based Permissions by Role ---
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const meta = table.options.meta as any
-    const userRole = (meta?.userRole || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    const userRole = normalizeProgramacionAccessValue(meta?.userRole)
 
     const getCanWriteColumn = (): boolean => {
         // 1. GLOBAL OVERRIDE (Read-only tab)
@@ -189,7 +190,7 @@ const OTCell = React.memo(({ getValue, row: { original }, column: { id }, table 
     // Permission check - Column-based restrictions by role
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const meta = table.options.meta as any
-    const userRole = (meta?.userRole || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    const userRole = normalizeProgramacionAccessValue(meta?.userRole)
 
     const getCanWriteColumn = (): boolean => {
         if (meta?.canWrite === false) return false
@@ -273,9 +274,11 @@ const SmartDateCell = React.memo(({ getValue, row: { original }, column: { id },
     // Permission check - Column-based restrictions by role
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const meta = table.options.meta as any
-    const userRole = (meta?.userRole || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    const userRole = normalizeProgramacionAccessValue(meta?.userRole)
+    const hasScopedAccess = hasScopedProgramacionColumnAccess(meta?.userEmail, id, meta?.viewMode)
 
     const getCanWriteColumn = (): boolean => {
+        if (hasScopedAccess) return true
         if (meta?.canWrite === false) return false
         if (userRole === 'admin') return true
         if (userRole === 'laboratorio_lector' || userRole.includes('lector')) return false
@@ -407,7 +410,7 @@ const CodigoMuestraCell = React.memo(({ getValue, row: { original }, column: { i
     // Permission check - Column-based restrictions by role
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const meta = table.options.meta as any
-    const userRole = (meta?.userRole || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    const userRole = normalizeProgramacionAccessValue(meta?.userRole)
 
     const getCanWriteColumn = (): boolean => {
         if (meta?.canWrite === false) return false
@@ -494,7 +497,7 @@ const CotizacionCell = React.memo(({ getValue, row: { original }, column: { id }
     // --- Column-based permissions: tipificador and administrativo CANNOT edit cotizacion_lab ---
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const meta = table.options.meta as any
-    const userRole = (meta?.userRole || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    const userRole = normalizeProgramacionAccessValue(meta?.userRole)
 
     const getCanEditCotizacion = (): boolean => {
         if (meta?.canWrite === false) return false
@@ -586,9 +589,11 @@ const StatusCell = React.memo(({ getValue, row: { original }, column: { id }, ta
     // --- Column-based permissions: lector CANNOT edit estado_trabajo ---
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const meta = table.options.meta as any
-    const userRole = (meta?.userRole || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    const userRole = normalizeProgramacionAccessValue(meta?.userRole)
+    const hasScopedAccess = hasScopedProgramacionColumnAccess(meta?.userEmail, id, meta?.viewMode)
 
     const getCanEditStatus = (): boolean => {
+        if (hasScopedAccess) return true
         if (meta?.canWrite === false) return false
         if (userRole === 'admin') return true
         // lector cannot edit anything
@@ -624,7 +629,7 @@ const AutorizacionCell = React.memo(({ getValue, row: { original }, column: { id
     // --- Column-based permissions: tipificador CANNOT edit autorizacion_lab ---
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const meta = table.options.meta as any
-    const userRole = (meta?.userRole || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    const userRole = normalizeProgramacionAccessValue(meta?.userRole)
 
     const getCanEditAutorizacion = (): boolean => {
         if (meta?.canWrite === false) return false
@@ -668,7 +673,7 @@ const PaymentStatusCell = React.memo(({ getValue, row, column: { id }, table }: 
     // --- Column-based permissions: vendor CANNOT edit estado_pago ---
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const meta = table.options.meta as any
-    const userRole = (meta?.userRole || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    const userRole = normalizeProgramacionAccessValue(meta?.userRole)
 
     const getCanEditPayment = (): boolean => {
         if (meta?.canWrite === false) return false

@@ -11,6 +11,8 @@ import { useProgramacionData } from "@/hooks/use-programacion-data"
 import { RefreshCw, Wifi, WifiOff, FileDown, Info, Lock } from "lucide-react"
 import { LoginButton } from "@/components/login-button"
 import { useCurrentUser } from "@/hooks/use-current-user"
+import type { ProgramacionServicio } from "@/types/programacion"
+import { hasScopedProgramacionViewAccess } from "@/lib/programacion-column-access"
 
 type ViewMode = "LAB" | "COM" | "ADMIN"
 
@@ -24,6 +26,8 @@ const roleToViewMap: Record<string, ViewMode> = {
     auxiliar_comercial: "COM",
     laboratorio_lector: "LAB",
     laboratorio_tipificador: "LAB",
+    oficina_tecnica: "LAB",
+    oficina_tecnica_humedad: "LAB",
     oficina_tecnica_humedad_tipificador: "LAB",
 }
 
@@ -68,11 +72,11 @@ function readStoredView(identity: string): ViewMode | null {
 export function DatagridEditor() {
     const searchParams = useSearchParams()
     const modeParam = searchParams.get('mode')
-    const { loading: authLoading, userId, role, allowedViews, getCanView, getCanWrite, needsAuth, permissions } = useCurrentUser()
+    const { loading: authLoading, userId, role, email, allowedViews, getCanView, getCanWrite, needsAuth, permissions } = useCurrentUser()
     const { data, isLoading, realtimeStatus, updateField, insertRow, exportToExcel } = useProgramacionData()
 
     // State to track filtered data for Excel export
-    const [filteredItems, setFilteredItems] = React.useState<any[]>([])
+    const [filteredItems, setFilteredItems] = React.useState<ProgramacionServicio[]>([])
 
     // Initialize state based on URL param, with role-based fallback
     const roleParam = searchParams.get('role') || ''
@@ -87,6 +91,7 @@ export function DatagridEditor() {
 
 
     const canWrite = React.useMemo(() => getCanWrite(viewMode), [viewMode, getCanWrite])
+    const hasScopedLabColumnAccess = hasScopedProgramacionViewAccess(email, viewMode)
 
     // URL mode always wins over local persistence.
     React.useEffect(() => {
@@ -232,10 +237,16 @@ export function DatagridEditor() {
                         )}
                     </div>
 
-                    {!canWrite && (
+                    {!canWrite && !hasScopedLabColumnAccess && (
                         <span className="px-2.5 py-1 text-[10px] uppercase font-bold text-amber-600 bg-amber-50 border border-amber-200 rounded-md flex items-center gap-1.5 cursor-default" title="Solo lectura para esta vista">
                             <Info className="w-3 h-3" />
                             Vista Solo Lectura
+                        </span>
+                    )}
+                    {!canWrite && hasScopedLabColumnAccess && (
+                        <span className="px-2.5 py-1 text-[10px] uppercase font-bold text-blue-700 bg-blue-50 border border-blue-200 rounded-md flex items-center gap-1.5 cursor-default" title="Permiso limitado: solo Entrega real y Estado">
+                            <Info className="w-3 h-3" />
+                            Edicion Limitada
                         </span>
                     )}
                 </div>
@@ -279,6 +290,7 @@ export function DatagridEditor() {
                     onUpdate={updateField}
                     onInsert={canWrite ? insertRow : undefined}
                     userRole={role || ''}
+                    userEmail={email || ''}
                     canWrite={canWrite}
                     permissions={permissions}
                     viewMode={viewMode}
