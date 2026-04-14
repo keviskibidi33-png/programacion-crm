@@ -243,11 +243,11 @@ export function useCurrentUser() {
                                 write: dbPerms.programacion?.write || false,
                                 delete: dbPerms.programacion?.delete || false
                             },
-                            ...(dbPerms.laboratorio ? { laboratorio: {
+                            laboratorio: {
                                 read: true,
                                 write: dbPerms.laboratorio?.write || false,
                                 delete: dbPerms.laboratorio?.delete || false
-                            }} : {}),
+                            },
                             ...(dbPerms.comercial ? { comercial: {
                                 read: true,
                                 write: dbPerms.comercial?.write || false,
