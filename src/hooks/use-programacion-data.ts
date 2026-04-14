@@ -24,9 +24,37 @@ class ExpiringSet {
 }
 
 const EXPORT_AUTH_TRACE_PREFIX = "[ProgramacionExportAuth]"
+const PROGRAMACION_EXPORT_DEBUG = process.env.NODE_ENV !== "production" || process.env.NEXT_PUBLIC_DEBUG_IFRAME_BRIDGE === "true"
 
 function buildTraceId() {
     return `prog-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+}
+
+function exportDebugLog(message: string, payload?: unknown) {
+    if (PROGRAMACION_EXPORT_DEBUG) {
+        console.info(`${EXPORT_AUTH_TRACE_PREFIX} ${message}`, payload)
+    }
+}
+
+function resolveParentOrigin(): string | null {
+    if (typeof window === "undefined") return null
+
+    const selfOrigin = window.location.origin
+    const candidates = [document.referrer, process.env.NEXT_PUBLIC_CRM_PARENT_ORIGIN]
+
+    for (const candidate of candidates) {
+        if (!candidate) continue
+        try {
+            const origin = new URL(candidate).origin
+            if (origin && origin !== selfOrigin) {
+                return origin
+            }
+        } catch {
+            // Ignore malformed parent origin candidates.
+        }
+    }
+
+    return null
 }
 
 export function useProgramacionData() {
@@ -73,12 +101,17 @@ export function useProgramacionData() {
 
     const requestTokenFromParent = useCallback(async (traceId: string, timeoutMs = 5000): Promise<string | null> => {
         if (typeof window === "undefined" || window.parent === window) {
-            console.warn(`${EXPORT_AUTH_TRACE_PREFIX}[${traceId}] Parent token request skipped`, {
-                hasWindow: typeof window !== "undefined",
-                isIframe: typeof window !== "undefined" ? window.parent !== window : false,
-            })
+            if (PROGRAMACION_EXPORT_DEBUG) {
+                console.warn(`${EXPORT_AUTH_TRACE_PREFIX}[${traceId}] Parent token request skipped`, {
+                    hasWindow: typeof window !== "undefined",
+                    isIframe: typeof window !== "undefined" ? window.parent !== window : false,
+                })
+            }
             return null
         }
+
+        const parentOrigin = resolveParentOrigin()
+        const targetOrigin = parentOrigin ?? "*"
 
         return await new Promise<string | null>((resolve) => {
             let resolved = false
@@ -91,6 +124,7 @@ export function useProgramacionData() {
 
             const onMessage = (event: MessageEvent) => {
                 if (event.source !== window.parent) return
+                if (parentOrigin && event.origin !== parentOrigin) return
                 if (event.data?.requestId && event.data.requestId !== traceId) return
                 if (event.data?.type === "TOKEN_REFRESH" && event.data?.token) {
                     resolved = true
@@ -98,7 +132,7 @@ export function useProgramacionData() {
                     const token = String(event.data.token)
                     localStorage.setItem("programacion_access_token", token)
                     localStorage.setItem("token", token)
-                    console.info(`${EXPORT_AUTH_TRACE_PREFIX}[${traceId}] Token received from parent`, {
+                    exportDebugLog(`[${traceId}] Token received from parent`, {
                         elapsedMs: Date.now() - startedAt,
                         origin: event.origin,
                     })
@@ -112,17 +146,19 @@ export function useProgramacionData() {
                     console.error(`${EXPORT_AUTH_TRACE_PREFIX}[${traceId}] Parent token request timed out`, {
                         timeoutMs,
                         elapsedMs: Date.now() - startedAt,
+                        expectedOrigin: parentOrigin,
                     })
                     resolve(null)
                 }
             }, timeoutMs)
 
-            console.info(`${EXPORT_AUTH_TRACE_PREFIX}[${traceId}] Requesting token from parent`, {
+            exportDebugLog(`[${traceId}] Requesting token from parent`, {
                 timeoutMs,
                 origin: window.location.origin,
+                targetOrigin,
             })
             window.addEventListener("message", onMessage)
-            window.parent.postMessage({ type: "TOKEN_REFRESH_REQUEST", requestId: traceId, source: "programacion_export" }, "*")
+            window.parent.postMessage({ type: "TOKEN_REFRESH_REQUEST", requestId: traceId, source: "programacion_export" }, targetOrigin)
         })
     }, [])
 
@@ -371,7 +407,7 @@ export function useProgramacionData() {
                 : await requestTokenFromParent(traceId, 5000)
             const accessToken = sessionToken || urlToken || localToken || parentToken
 
-            console.info(`${EXPORT_AUTH_TRACE_PREFIX}[${traceId}] Token source evaluation`, {
+            exportDebugLog(`[${traceId}] Token source evaluation`, {
                 mode,
                 itemCount: items.length,
                 session: !!sessionToken,
@@ -391,7 +427,10 @@ export function useProgramacionData() {
                     iframe: typeof window !== "undefined" ? window.parent !== window : false,
                 }
                 if (typeof window !== "undefined" && window.parent !== window) {
-                    window.parent.postMessage({ type: "AUTH_REQUIRED", source: "programacion_export", debug, requestId: traceId }, "*")
+                    window.parent.postMessage(
+                        { type: "AUTH_REQUIRED", source: "programacion_export", debug, requestId: traceId },
+                        resolveParentOrigin() ?? "*",
+                    )
                 }
                 throw new Error(`Token de autenticación requerido para exportar ${JSON.stringify(debug)}`)
             }
@@ -400,7 +439,7 @@ export function useProgramacionData() {
                 localStorage.setItem("programacion_access_token", accessToken)
                 localStorage.setItem("token", accessToken)
             }
-            console.info(`${EXPORT_AUTH_TRACE_PREFIX}[${traceId}] Token selected`, {
+            exportDebugLog(`[${traceId}] Token selected`, {
                 source: sessionToken ? "session" : urlToken ? "url" : localToken ? "local" : "parent",
                 elapsedMs: Date.now() - startedAt,
             })

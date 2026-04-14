@@ -87,8 +87,6 @@ export function useCurrentUser() {
     const [needsAuth, setNeedsAuth] = useState(false)
     const [tokenApplied, setTokenApplied] = useState(false)
 
-    const [allowedViews, setAllowedViews] = useState<ViewMode[]>(["LAB", "COM", "ADMIN"])
-
     const [permissions, setPermissions] = useState<PermissionMap>(() => {
         // Initial permissions: minimal until DB load completes
         const rNorm = (qRole || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
@@ -119,6 +117,8 @@ export function useCurrentUser() {
             }
         }
     })
+
+    const [allowedViews, setAllowedViews] = useState<ViewMode[]>(() => getAllowedViewsFromPermissions(permissions))
 
     useEffect(() => {
         async function fetchIdentityAndPerms() {
@@ -243,21 +243,21 @@ export function useCurrentUser() {
                                 write: dbPerms.programacion?.write || false,
                                 delete: dbPerms.programacion?.delete || false
                             },
-                            laboratorio: {
+                            ...(dbPerms.laboratorio ? { laboratorio: {
                                 read: true,
                                 write: dbPerms.laboratorio?.write || false,
                                 delete: dbPerms.laboratorio?.delete || false
-                            },
-                            comercial: {
+                            }} : {}),
+                            ...(dbPerms.comercial ? { comercial: {
                                 read: true,
                                 write: dbPerms.comercial?.write || false,
                                 delete: dbPerms.comercial?.delete || false
-                            },
-                            administracion: {
+                            }} : {}),
+                            ...(dbPerms.administracion ? { administracion: {
                                 read: true,
                                 write: dbPerms.administracion?.write || false,
                                 delete: dbPerms.administracion?.delete || false
-                            }
+                            }} : {})
                         }
 
                         const effectivePerms = applyRestrictedControlAccess(typedProfile.email, normalizedPerms)
