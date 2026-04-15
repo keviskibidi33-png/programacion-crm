@@ -337,6 +337,7 @@ export function DataTable<TData, TValue>({
                             <option value="PROCESO">En Proceso</option>
                             <option value="INFORME LISTO">Informe Listo</option>
                             <option value="ENTREGADO">Entregar</option>
+                            <option value="ANULADO">Anulado</option>
                         </select>
                     )}
 
