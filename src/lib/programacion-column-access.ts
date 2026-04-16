@@ -7,6 +7,7 @@ const SPECIAL_PROGRAMACION_COLUMN_EDITOR_EMAILS = new Set([
 const SPECIAL_PROGRAMACION_EDITABLE_COLUMNS = new Set([
     "entrega_real",
     "estado_trabajo",
+    "nota_lab",
 ])
 
 export function normalizeProgramacionAccessValue(value: string | null | undefined) {

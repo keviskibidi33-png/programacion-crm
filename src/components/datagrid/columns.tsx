@@ -55,8 +55,12 @@ const EditableCell = React.memo(({ getValue, row: { original }, column: { id }, 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const meta = table.options.meta as any
     const userRole = normalizeProgramacionAccessValue(meta?.userRole)
+    const hasScopedAccess = hasScopedProgramacionColumnAccess(meta?.userEmail, id, meta?.viewMode)
 
     const getCanWriteColumn = (): boolean => {
+        // 0. SCOPED COLUMN ACCESS (e.g. oficina_tecnica with nota_lab)
+        if (hasScopedAccess) return true
+
         // 1. GLOBAL OVERRIDE (Read-only tab)
         if (meta?.canWrite === false) return false
 
