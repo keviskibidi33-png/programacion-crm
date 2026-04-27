@@ -82,47 +82,53 @@ export function GhostRow<TData>({ table, onInsert }: GhostRowProps<TData>) {
         }
 
 
-        // Date fields: auto-complete to show DD/MM/YY format (store ISO internally for DB)
+        // Date fields: auto-complete to show YYYY/MM/DD format (store ISO internally for DB)
         const isDateField = ['fecha_recepcion', 'fecha_inicio', 'fecha_entrega_estimada', 'entrega_real', 'fecha_solicitud_com', 'fecha_entrega_com', 'fecha_pago'].includes(columnId)
         if (isDateField && formatted) {
             let day = ''
             let month = ''
-            let yearFull = '2026'
-            let yearShort = '26'
+            let yearFull = String(new Date().getFullYear())
 
             if (/^\d{4}$/.test(formatted)) {
-                // 1212 → 12/12/26
-                day = formatted.slice(0, 2)
-                month = formatted.slice(2, 4)
+                // 1212 -> YYYY/12/12
+                month = formatted.slice(0, 2)
+                day = formatted.slice(2, 4)
             } else if (/^\d{6}$/.test(formatted)) {
-                // 121226 → 12/12/26
+                // 121226 -> 2026/12/12
                 day = formatted.slice(0, 2)
                 month = formatted.slice(2, 4)
-                yearShort = formatted.slice(4, 6)
-                yearFull = `20${yearShort}`
+                yearFull = `20${formatted.slice(4, 6)}`
             } else if (/^\d{8}$/.test(formatted)) {
-                // 12122026 → 12/12/2026
-                day = formatted.slice(0, 2)
-                month = formatted.slice(2, 4)
-                yearFull = formatted.slice(4, 8)
-                yearShort = yearFull.slice(-2)
+                // Prefer YYYYMMDD, fallback DDMMYYYY
+                const maybeYear = formatted.slice(0, 4)
+                if (Number(maybeYear) > 1900) {
+                    yearFull = maybeYear
+                    month = formatted.slice(4, 6)
+                    day = formatted.slice(6, 8)
+                } else {
+                    day = formatted.slice(0, 2)
+                    month = formatted.slice(2, 4)
+                    yearFull = formatted.slice(4, 8)
+                }
             } else if (/^\d{3}$/.test(formatted)) {
-                // 512 → 05/12/26
+                // 512 -> YYYY/12/05
                 day = formatted.slice(0, 1).padStart(2, '0')
                 month = formatted.slice(1, 3)
             } else if (!formatted.includes('-')) {
                 const parts = formatted.split(/[./-]/)
                 if (parts.length === 2) {
-                    day = parts[0]
-                    month = parts[1]
+                    month = parts[0]
+                    day = parts[1]
                 } else if (parts.length === 3) {
-                    day = parts[0]
-                    month = parts[1]
-                    const y = parts[2]
-                    if (y.length === 2) {
-                        yearShort = y; yearFull = `20${y}`
+                    if (parts[0].length === 4) {
+                        yearFull = parts[0]
+                        month = parts[1]
+                        day = parts[2]
                     } else {
-                        yearFull = y; yearShort = y.slice(-2)
+                        day = parts[0]
+                        month = parts[1]
+                        const y = parts[2]
+                        yearFull = y.length === 2 ? `20${y}` : y
                     }
                 }
             }
@@ -130,7 +136,7 @@ export function GhostRow<TData>({ table, onInsert }: GhostRowProps<TData>) {
             if (day && month) {
                 day = day.padStart(2, '0')
                 month = month.padStart(2, '0')
-                formatted = `${day}/${month}/${yearShort}`
+                formatted = `${yearFull}/${month}/${day}`
                 setNewData(prev => ({
                     ...prev,
                     [columnId]: formatted,

@@ -19,7 +19,7 @@ declare module "@tanstack/react-table" {
     }
 }
 
-// Utility to format date as DD/MM/YY
+// Utility to format date as YYYY/MM/DD
 const formatDateToShort = (dateStr: string | null) => {
     if (!dateStr) return null
     try {
@@ -27,8 +27,8 @@ const formatDateToShort = (dateStr: string | null) => {
         if (isNaN(date.getTime())) return dateStr
         const day = String(date.getDate()).padStart(2, '0')
         const month = String(date.getMonth() + 1).padStart(2, '0')
-        const year = String(date.getFullYear()).slice(-2)
-        return `${day}/${month}/${year}`
+        const year = String(date.getFullYear())
+        return `${year}/${month}/${day}`
     } catch {
         return dateStr
     }
@@ -257,7 +257,7 @@ const OTCell = React.memo(({ getValue, row: { original }, column: { id }, table 
 })
 OTCell.displayName = "OTCell"
 
-// Smart Date Cell (DD/MM -> YYYY-MM-DD)
+// Smart Date Cell (normalizes to ISO from YYYY/MM/DD or legacy DD/MM)
 const SmartDateCell = React.memo(({ getValue, row: { original }, column: { id }, table }: EditableCellProps<ProgramacionServicio>) => {
     const rawValue = getValue() as string
     const formatDisplay = (val: string) => {
@@ -306,22 +306,38 @@ const SmartDateCell = React.memo(({ getValue, row: { original }, column: { id },
         const finalVal = inputValue.trim()
         let valToParse = finalVal
         if (/^\d{3}$/.test(valToParse)) valToParse = "0" + valToParse
-        const shortDateRegex = /^(\d{1,2})[./探](\d{1,2})$/
-        const numericMatch = valToParse.match(/^(\d{2})(\d{2})(\d{2}|\d{4})?$/)
+        const currentYear = String(new Date().getFullYear())
+        const shortDateRegex = /^(\d{1,2})[./-](\d{1,2})$/
+        const numericMatch = valToParse.match(/^(\d{4})(\d{2})(\d{2})$|^(\d{2})(\d{2})(\d{2}|\d{4})?$/)
         const match = valToParse.match(shortDateRegex)
         let isoDate = null
         if (numericMatch) {
-            const day = numericMatch[1]; const month = numericMatch[2]
-            let year = numericMatch[3] || "2026"
-            if (year.length === 2) year = "20" + year
-            isoDate = `${year}-${month}-${day}`
+            if (numericMatch[1]) {
+                const year = numericMatch[1]
+                const month = numericMatch[2]
+                const day = numericMatch[3]
+                isoDate = `${year}-${month}-${day}`
+            } else {
+                const day = numericMatch[4]; const month = numericMatch[5]
+                let year = numericMatch[6] || currentYear
+                if (year.length === 2) year = "20" + year
+                isoDate = `${year}-${month}-${day}`
+            }
         } else if (match) {
             const day = match[1].padStart(2, '0'); const month = match[2].padStart(2, '0')
-            isoDate = `2026-${month}-${day}`
+            isoDate = `${currentYear}-${month}-${day}`
         } else {
-            const fullDateRegex = /^(\d{1,2})[./探](\d{1,2})[./探](\d{4}|\d{2})$/
+            const ymdRegex = /^(\d{4})[./-](\d{1,2})[./-](\d{1,2})$/
+            const ymdMatch = finalVal.match(ymdRegex)
+            if (ymdMatch) {
+                const y = ymdMatch[1]
+                const m = ymdMatch[2].padStart(2, '0')
+                const d = ymdMatch[3].padStart(2, '0')
+                isoDate = `${y}-${m}-${d}`
+            }
+            const fullDateRegex = /^(\d{1,2})[./-](\d{1,2})[./-](\d{4}|\d{2})$/
             const fullMatch = finalVal.match(fullDateRegex)
-            if (fullMatch) {
+            if (!isoDate && fullMatch) {
                 const d = fullMatch[1].padStart(2, '0'); const m = fullMatch[2].padStart(2, '0')
                 let y = fullMatch[3]; if (y.length === 2) y = "20" + y
                 isoDate = `${y}-${m}-${d}`
@@ -359,7 +375,7 @@ const SmartDateCell = React.memo(({ getValue, row: { original }, column: { id },
                 onChange={e => setInputValue(e.target.value)}
                 onBlur={onBlur}
                 onKeyDown={onKeyDown}
-                placeholder="dd/mm"
+                placeholder="yyyy/mm/dd"
                 className="w-full bg-white border border-blue-400 rounded px-1 -mx-1 h-full text-zinc-900 font-medium"
             />
         )
@@ -374,13 +390,13 @@ const SmartDateCell = React.memo(({ getValue, row: { original }, column: { id },
             )}
             title={canWrite ? "Click para editar" : "Sin permiso de edición"}
         >
-            {inputValue || <span className="text-zinc-300">--/--</span>}
+            {inputValue || <span className="text-zinc-300">----/--/--</span>}
         </div>
     )
 })
 SmartDateCell.displayName = "SmartDateCell"
 
-// Date Display Component (Shows DD/MM/YY, becomes picker on click)
+// Date Display Component (Shows YYYY/MM/DD, becomes picker on click)
 const DateDisplayCell = React.memo(({ getValue, row, column, table, className }: EditableCellProps<ProgramacionServicio>) => {
     const [isEditing, setIsEditing] = React.useState(false)
     const value = getValue() as string
@@ -399,7 +415,7 @@ const DateDisplayCell = React.memo(({ getValue, row, column, table, className }:
             onClick={() => setIsEditing(true)}
             className={cn("w-full h-full cursor-pointer hover:bg-zinc-100/50 flex items-center px-1 text-zinc-900", className)}
         >
-            {formatted || <span className="text-zinc-300">--/--/--</span>}
+            {formatted || <span className="text-zinc-300">----/--/--</span>}
         </div>
     )
 })
