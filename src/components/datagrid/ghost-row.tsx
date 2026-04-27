@@ -82,7 +82,7 @@ export function GhostRow<TData>({ table, onInsert }: GhostRowProps<TData>) {
         }
 
 
-        // Date fields: auto-complete to show YYYY/MM/DD format (store ISO internally for DB)
+        // Date fields: auto-complete to show DD/MM/YYYY format (store ISO internally for DB)
         const isDateField = ['fecha_recepcion', 'fecha_inicio', 'fecha_entrega_estimada', 'entrega_real', 'fecha_solicitud_com', 'fecha_entrega_com', 'fecha_pago'].includes(columnId)
         if (isDateField && formatted) {
             let day = ''
@@ -90,11 +90,11 @@ export function GhostRow<TData>({ table, onInsert }: GhostRowProps<TData>) {
             let yearFull = String(new Date().getFullYear())
 
             if (/^\d{4}$/.test(formatted)) {
-                // 1212 -> YYYY/12/12
+                // 1212 -> 12/12/YYYY
                 month = formatted.slice(0, 2)
                 day = formatted.slice(2, 4)
             } else if (/^\d{6}$/.test(formatted)) {
-                // 121226 -> 2026/12/12
+                // 121226 -> 12/12/2026
                 day = formatted.slice(0, 2)
                 month = formatted.slice(2, 4)
                 yearFull = `20${formatted.slice(4, 6)}`
@@ -117,8 +117,8 @@ export function GhostRow<TData>({ table, onInsert }: GhostRowProps<TData>) {
             } else if (!formatted.includes('-')) {
                 const parts = formatted.split(/[./-]/)
                 if (parts.length === 2) {
-                    month = parts[0]
-                    day = parts[1]
+                    day = parts[0]
+                    month = parts[1]
                 } else if (parts.length === 3) {
                     if (parts[0].length === 4) {
                         yearFull = parts[0]
@@ -136,7 +136,7 @@ export function GhostRow<TData>({ table, onInsert }: GhostRowProps<TData>) {
             if (day && month) {
                 day = day.padStart(2, '0')
                 month = month.padStart(2, '0')
-                formatted = `${yearFull}/${month}/${day}`
+                formatted = `${day}/${month}/${yearFull}`
                 setNewData(prev => ({
                     ...prev,
                     [columnId]: formatted,

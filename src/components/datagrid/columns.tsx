@@ -19,7 +19,7 @@ declare module "@tanstack/react-table" {
     }
 }
 
-// Utility to format date as YYYY/MM/DD
+// Utility to format date as DD/MM/YYYY
 const formatDateToShort = (dateStr: string | null) => {
     if (!dateStr) return null
     try {
@@ -28,7 +28,7 @@ const formatDateToShort = (dateStr: string | null) => {
         const day = String(date.getDate()).padStart(2, '0')
         const month = String(date.getMonth() + 1).padStart(2, '0')
         const year = String(date.getFullYear())
-        return `${year}/${month}/${day}`
+        return `${day}/${month}/${year}`
     } catch {
         return dateStr
     }
@@ -257,7 +257,7 @@ const OTCell = React.memo(({ getValue, row: { original }, column: { id }, table 
 })
 OTCell.displayName = "OTCell"
 
-// Smart Date Cell (normalizes to ISO from YYYY/MM/DD or legacy DD/MM)
+// Smart Date Cell (normalizes to ISO from DD/MM/YYYY or legacy inputs)
 const SmartDateCell = React.memo(({ getValue, row: { original }, column: { id }, table }: EditableCellProps<ProgramacionServicio>) => {
     const rawValue = getValue() as string
     const formatDisplay = (val: string) => {
@@ -267,7 +267,7 @@ const SmartDateCell = React.memo(({ getValue, row: { original }, column: { id },
             if (isNaN(date.getTime())) return val
             const d = String(date.getUTCDate()).padStart(2, '0')
             const m = String(date.getUTCMonth() + 1).padStart(2, '0')
-            const y = String(date.getUTCFullYear()).slice(-2)
+            const y = String(date.getUTCFullYear())
             return `${d}/${m}/${y}`
         } catch { return val }
     }
@@ -375,7 +375,7 @@ const SmartDateCell = React.memo(({ getValue, row: { original }, column: { id },
                 onChange={e => setInputValue(e.target.value)}
                 onBlur={onBlur}
                 onKeyDown={onKeyDown}
-                placeholder="yyyy/mm/dd"
+                placeholder="dd/mm/yyyy"
                 className="w-full bg-white border border-blue-400 rounded px-1 -mx-1 h-full text-zinc-900 font-medium"
             />
         )
@@ -390,13 +390,13 @@ const SmartDateCell = React.memo(({ getValue, row: { original }, column: { id },
             )}
             title={canWrite ? "Click para editar" : "Sin permiso de edición"}
         >
-            {inputValue || <span className="text-zinc-300">----/--/--</span>}
+            {inputValue || <span className="text-zinc-300">--/--/----</span>}
         </div>
     )
 })
 SmartDateCell.displayName = "SmartDateCell"
 
-// Date Display Component (Shows YYYY/MM/DD, becomes picker on click)
+// Date Display Component (Shows DD/MM/YYYY, becomes picker on click)
 const DateDisplayCell = React.memo(({ getValue, row, column, table, className }: EditableCellProps<ProgramacionServicio>) => {
     const [isEditing, setIsEditing] = React.useState(false)
     const value = getValue() as string
@@ -415,7 +415,7 @@ const DateDisplayCell = React.memo(({ getValue, row, column, table, className }:
             onClick={() => setIsEditing(true)}
             className={cn("w-full h-full cursor-pointer hover:bg-zinc-100/50 flex items-center px-1 text-zinc-900", className)}
         >
-            {formatted || <span className="text-zinc-300">----/--/--</span>}
+            {formatted || <span className="text-zinc-300">--/--/----</span>}
         </div>
     )
 })
