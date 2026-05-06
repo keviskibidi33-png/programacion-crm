@@ -4,6 +4,7 @@ import { createClient } from "@/utils/supabase/client"
 import { useCurrentUser } from "./use-current-user"
 import { ProgramacionServicio } from "@/types/programacion"
 import { toast } from "sonner"
+import { normalizeProgramacionOtValue } from "@/lib/programacion-ot"
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -320,9 +321,11 @@ export function useProgramacionData() {
     }, [queryClient, supabase])
 
     const insertRow = useCallback(async (newRow: Partial<ProgramacionServicio>) => {
-        const otNumero = extractLeadingNumber(newRow.ot)
+        const normalizedOt = normalizeProgramacionOtValue(newRow.ot)
+        const otNumero = extractLeadingNumber(normalizedOt)
         const labData: any = {
             ...newRow,
+            ot: normalizedOt || newRow.ot,
             ...(otNumero ? { item_numero: otNumero } : {}),
             estado_trabajo: newRow.estado_trabajo || "PENDIENTE",
         }
