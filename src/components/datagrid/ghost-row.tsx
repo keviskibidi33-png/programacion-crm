@@ -7,6 +7,7 @@ import { StatusSelect } from "./status-select"
 import { PaymentSelect } from "./payment-select"
 import { AuthorizationSelect } from "./authorization-select"
 import { toast } from "sonner"
+import { normalizeProgramacionOtValue } from "@/lib/programacion-ot"
 
 // Zod Schema for validation
 const insertSchema = z.object({
@@ -51,10 +52,7 @@ export function GhostRow<TData>({ table, onInsert }: GhostRowProps<TData>) {
         }
 
         if (columnId === 'ot') {
-            // Append -26 if only digits are entered (no LEM)
-            if (/^\d+$/.test(formatted)) {
-                formatted = `${formatted}-26`
-            }
+            formatted = normalizeProgramacionOtValue(formatted)
         }
 
         if (columnId === 'cotizacion_lab') {

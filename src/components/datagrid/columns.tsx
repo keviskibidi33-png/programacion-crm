@@ -5,6 +5,7 @@ import { ProgramacionServicio } from "@/types/programacion"
 import React from "react"
 import { ArrowUpDown } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { normalizeProgramacionOtValue } from "@/lib/programacion-ot"
 import { StatusSelect } from "./status-select"
 import { AuthorizationSelect } from "./authorization-select"
 import { PaymentSelect } from "./payment-select"
@@ -184,11 +185,10 @@ EditableCell.displayName = "EditableCell"
 // OT Cell (Auto-adds -26 when user enters just digits)
 const OTCell = React.memo(({ getValue, row: { original }, column: { id }, table }: EditableCellProps<ProgramacionServicio>) => {
     const rawValue = getValue() as string
-    const cleanValue = (val: string) => val ? val.replace(/LEM/i, '').replace(/-26$/, '').trim() : ""
-    const [value, setValue] = React.useState(cleanValue(rawValue))
+    const [value, setValue] = React.useState(normalizeProgramacionOtValue(rawValue))
 
     React.useEffect(() => {
-        setValue(cleanValue(rawValue))
+        setValue(normalizeProgramacionOtValue(rawValue))
     }, [rawValue])
 
     // Permission check - Column-based restrictions by role
@@ -209,15 +209,7 @@ const OTCell = React.memo(({ getValue, row: { original }, column: { id }, table 
 
     const onBlur = () => {
         if (!canWrite) return
-        let finalValue = value.trim()
-        if (finalValue && /^\d+$/.test(finalValue)) {
-            finalValue = `${finalValue}-26`
-        } else if (finalValue && !finalValue.includes('-26')) {
-            finalValue = finalValue.replace(/-$/, '')
-            if (/^\d+$/.test(finalValue)) {
-                finalValue = `${finalValue}-26`
-            }
-        }
+        const finalValue = normalizeProgramacionOtValue(value)
         if (finalValue !== rawValue) {
             table.options.meta?.updateData(original.id, id, finalValue)
         }
