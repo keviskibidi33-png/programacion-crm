@@ -69,7 +69,8 @@ function resolveParentOrigin(): string | null {
 export function useProgramacionData() {
     const supabase = useMemo(() => createClient(), [])
     const queryClient = useQueryClient()
-    const { loading: authLoading } = useCurrentUser()
+    const { loading: authLoading, getCanView } = useCurrentUser()
+    const canViewProgramacion = getCanView("LAB")
     const [realtimeStatus, setRealtimeStatus] = useState<"CONNECTING" | "SUBSCRIBED" | "CHANNEL_ERROR" | "TIMED_OUT" | "CLOSED">("CONNECTING")
 
     // IDs written locally — kept for 4 s so ALL cascade events are skipped
@@ -174,7 +175,7 @@ export function useProgramacionData() {
     // 1. Fetch Inicial (Carga los 2000 registros una sola vez)
     const { data: programacion = [], isLoading } = useQuery({
         queryKey: ["programacion"],
-        enabled: !authLoading,
+        enabled: !authLoading && canViewProgramacion,
         staleTime: Infinity,
         refetchOnWindowFocus: false,
         refetchOnReconnect: false,
@@ -250,7 +251,7 @@ export function useProgramacionData() {
 
     // 3. Suscripción Realtime — ZERO invalidateQueries
     useEffect(() => {
-        if (authLoading) return
+        if (authLoading || !canViewProgramacion) return
 
         const channel = supabase
             .channel("programacion_realtime")
@@ -279,7 +280,7 @@ export function useProgramacionData() {
         return () => {
             supabase.removeChannel(channel)
         }
-    }, [supabase, authLoading, handleRealtimePayload])
+    }, [supabase, authLoading, canViewProgramacion, handleRealtimePayload])
 
     const updateField = useCallback(async (rowId: string, field: string, value: unknown) => {
         // 1. Optimistic Update in Cache (instant UI)
@@ -400,6 +401,14 @@ export function useProgramacionData() {
         const traceId = buildTraceId()
         const startedAt = Date.now()
         try {
+            const exportItems = mode === "lab"
+                ? items.map((item) => {
+                    const cleanItem = { ...(item as Record<string, unknown>) }
+                    delete cleanItem.costo_servicio
+                    return cleanItem
+                })
+                : items
+
             const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://api.geofal.com.pe"
             const { data: { session } } = await supabase.auth.getSession()
             let sessionToken = session?.access_token || null
@@ -422,7 +431,7 @@ export function useProgramacionData() {
 
             exportDebugLog(`[${traceId}] Token source evaluation`, {
                 mode,
-                itemCount: items.length,
+                itemCount: exportItems.length,
                 session: !!sessionToken,
                 url: !!urlToken,
                 local: !!localToken,
@@ -471,7 +480,7 @@ export function useProgramacionData() {
                     "Content-Type": "application/json",
                     "Authorization": `Bearer ${accessToken}`,
                 },
-                body: JSON.stringify({ items }),
+                body: JSON.stringify({ items: exportItems }),
             })
 
             if (!response.ok) {
