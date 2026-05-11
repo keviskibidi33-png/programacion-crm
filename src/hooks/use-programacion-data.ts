@@ -403,8 +403,9 @@ export function useProgramacionData() {
         try {
             const exportItems = mode === "lab"
                 ? items.map((item) => {
-                    const cleanItem = { ...(item as Record<string, unknown>) }
-                    delete cleanItem.costo_servicio
+                    const { costo_servicio: _costoServicio, ...cleanItem } =
+                        item as ProgramacionServicio & { costo_servicio?: unknown }
+                    void _costoServicio
                     return cleanItem
                 })
                 : items
