@@ -65,6 +65,15 @@ export function useProgramacionData() {
     const canViewProgramacion = getCanView("LAB")
     const [realtimeStatus, setRealtimeStatus] = useState<"CONNECTING" | "SUBSCRIBED" | "CHANNEL_ERROR" | "TIMED_OUT" | "CLOSED">("CONNECTING")
 
+    const deriveItemNumeroFromOt = useCallback((otValue: unknown): number | null => {
+        const normalizedOt = normalizeProgramacionOtValue(otValue)
+        const digits = normalizedOt.match(/\d+/)?.[0]
+        if (!digits) return null
+
+        const parsed = Number(digits)
+        return Number.isInteger(parsed) && parsed > 0 ? parsed : null
+    }, [])
+
     // IDs written locally — kept for 4 s so ALL cascade events are skipped
     const pendingLocalIds = useRef(new ExpiringSet())
     const getStoredAccessToken = useCallback((): string | null => {
@@ -282,9 +291,18 @@ export function useProgramacionData() {
             return
         }
 
+        const derivedItemNumero = field === "ot" ? deriveItemNumeroFromOt(value) : null
+
         // 1. Optimistic Update in Cache (instant UI)
         queryClient.setQueryData(["programacion"], (oldData: ProgramacionServicio[] = []) => {
-            return oldData.map(row => row.id === rowId ? { ...row, [field]: value } : row)
+            return oldData.map(row => {
+                if (row.id !== rowId) return row
+                const nextRow = { ...row, [field]: value }
+                if (derivedItemNumero !== null) {
+                    nextRow.item_numero = derivedItemNumero
+                }
+                return nextRow
+            })
         })
 
         // 2. Mark this ID so realtime skips the echo
@@ -314,7 +332,11 @@ export function useProgramacionData() {
 
             const { error } = await (supabase
                 .from(targetTable) as any)
-                .update({ [field]: value, updated_at: new Date().toISOString() })
+                .update({
+                    [field]: value,
+                    ...(derivedItemNumero !== null ? { item_numero: derivedItemNumero } : {}),
+                    updated_at: new Date().toISOString(),
+                })
                 .eq(idField, rowId)
 
             if (error) throw error
