@@ -27,6 +27,7 @@ export function GhostRow<TData>({ table, onInsert }: GhostRowProps<TData>) {
     const [isSubmitting, setIsSubmitting] = React.useState(false)
 
     const handleChange = (columnId: string, value: string) => {
+        if (columnId === 'item_numero') return
         setNewData(prev => ({ ...prev, [columnId]: value }))
         // Clear error on change
         if (errors[columnId]) {
@@ -218,6 +219,7 @@ export function GhostRow<TData>({ table, onInsert }: GhostRowProps<TData>) {
             // Convert display dates to ISO format for database
             const dateFields = ['fecha_recepcion', 'fecha_inicio', 'fecha_entrega_estimada', 'entrega_real']
             const submitData = { ...newData }
+            delete (submitData as Record<string, unknown>).item_numero
             for (const field of dateFields) {
                 const isoKey = `_${field}_iso` as keyof TData
                 if (submitData[isoKey as keyof typeof submitData]) {
@@ -270,6 +272,10 @@ export function GhostRow<TData>({ table, onInsert }: GhostRowProps<TData>) {
 
     // Permission check function (similar to columns.tsx)
     const getCanWriteColumn = (columnId: string): boolean => {
+        if (columnId === 'item_numero') {
+            return false
+        }
+
         // Role restrictions for ADMIN
         if (userRole === 'admin') {
             if (viewMode === 'LAB') {

@@ -37,14 +37,6 @@ function exportDebugLog(message: string, payload?: unknown) {
     }
 }
 
-function extractLeadingNumber(value: unknown): number | null {
-    const match = String(value ?? "").match(/\d+/)
-    if (!match) return null
-
-    const parsed = Number.parseInt(match[0], 10)
-    return Number.isFinite(parsed) ? parsed : null
-}
-
 function resolveParentOrigin(): string | null {
     if (typeof window === "undefined") return null
 
@@ -184,6 +176,8 @@ export function useProgramacionData() {
                 .from("cuadro_control") as any)
                 .select("*")
                 .order("item_numero", { ascending: true })
+                .order("created_at", { ascending: true })
+                .order("id", { ascending: true })
 
             if (error) {
                 console.error("Error fetching data:", error)
@@ -283,6 +277,11 @@ export function useProgramacionData() {
     }, [supabase, authLoading, canViewProgramacion, handleRealtimePayload])
 
     const updateField = useCallback(async (rowId: string, field: string, value: unknown) => {
+        if (field === "item_numero") {
+            // item_numero is a protected correlativo and must never be edited from the grid.
+            return
+        }
+
         // 1. Optimistic Update in Cache (instant UI)
         queryClient.setQueryData(["programacion"], (oldData: ProgramacionServicio[] = []) => {
             return oldData.map(row => row.id === rowId ? { ...row, [field]: value } : row)
@@ -292,7 +291,14 @@ export function useProgramacionData() {
         pendingLocalIds.current.add(rowId)
 
         try {
-            const commercialFields = ['fecha_solicitud_com', 'fecha_entrega_com', 'evidencia_solicitud_envio', 'dias_atraso_envio_coti', 'motivo_dias_atraso_com']
+            const commercialFields = [
+                'fecha_solicitud_com',
+                'fecha_entrega_com',
+                'evidencia_solicitud_envio',
+                'dias_atraso_envio_coti',
+                'motivo_dias_atraso_com',
+                'costo_servicio',
+            ]
             const adminFields = ['numero_factura', 'estado_pago', 'estado_autorizar', 'nota_admin']
 
             let targetTable = "programacion_lab"
@@ -323,15 +329,15 @@ export function useProgramacionData() {
 
     const insertRow = useCallback(async (newRow: Partial<ProgramacionServicio>) => {
         const normalizedOt = normalizeProgramacionOtValue(newRow.ot)
-        const otNumero = extractLeadingNumber(normalizedOt)
         const labData: any = {
             ...newRow,
             ot: normalizedOt || newRow.ot,
-            ...(otNumero ? { item_numero: otNumero } : {}),
             estado_trabajo: newRow.estado_trabajo || "PENDIENTE",
         }
 
-        if (!otNumero) delete labData.item_numero
+        // item_numero is a DB-managed correlativo; never derive it from OT
+        // because that reintroduces duplicated ITEM values when OT changes or repeats.
+        delete labData.item_numero
         delete labData.fecha_solicitud_com
         delete labData.fecha_entrega_com
         delete labData.evidencia_solicitud_envio
@@ -370,6 +376,9 @@ export function useProgramacionData() {
             if (newRow.fecha_entrega_com) commercialData.fecha_entrega_com = newRow.fecha_entrega_com
             if (newRow.evidencia_solicitud_envio) commercialData.evidencia_solicitud_envio = newRow.evidencia_solicitud_envio
             if (newRow.motivo_dias_atraso_com) commercialData.motivo_dias_atraso_com = newRow.motivo_dias_atraso_com
+            if (newRow.costo_servicio !== undefined && newRow.costo_servicio !== null && String(newRow.costo_servicio).trim() !== "") {
+                commercialData.costo_servicio = newRow.costo_servicio
+            }
 
             const adminData: any = {}
             if (newRow.numero_factura) adminData.numero_factura = newRow.numero_factura

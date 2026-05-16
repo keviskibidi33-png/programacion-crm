@@ -14,7 +14,7 @@ import { hasScopedProgramacionViewAccess } from "@/lib/programacion-column-acces
 const PROGRAMACION_TABLE_STORAGE_PREFIX = "programacion:table-state:v1"
 
 export function DatagridEditor() {
-    const { loading: authLoading, userId, role, email, getCanWrite, needsAuth, permissions } = useCurrentUser()
+    const { loading: authLoading, userId, role, email, getCanWrite, getCanView, needsAuth, permissions } = useCurrentUser()
     const { data, isLoading, realtimeStatus, updateField, insertRow, exportToExcel } = useProgramacionData()
 
     // State to track filtered data for Excel export
@@ -25,6 +25,7 @@ export function DatagridEditor() {
         [role, userId],
     )
     const viewMode = "LAB" as const
+    const canViewLab = React.useMemo(() => getCanView(viewMode), [getCanView, viewMode])
     const canWrite = React.useMemo(() => getCanWrite(viewMode), [viewMode, getCanWrite])
     const hasScopedLabColumnAccess = hasScopedProgramacionViewAccess(email, viewMode)
 
@@ -57,6 +58,25 @@ export function DatagridEditor() {
                     <div className="w-full h-px bg-zinc-100 mb-8" />
                     <LoginButton />
                     <p className="mt-6 text-[11px] text-zinc-400 uppercase tracking-widest font-semibold font-mono">
+                        GEO-FAL S.A.S • Seguridad Interna
+                    </p>
+                </div>
+            </div>
+        )
+    }
+
+    if (!canViewLab) {
+        return (
+            <div className="flex h-screen w-full flex-col items-center justify-center bg-zinc-50 p-4">
+                <div className="w-full max-w-md rounded-xl border border-zinc-200 bg-white p-8 text-center shadow-xl">
+                    <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-red-50">
+                        <Lock className="h-8 w-8 text-red-600" />
+                    </div>
+                    <h2 className="mb-2 text-2xl font-bold text-zinc-900">Acceso Denegado</h2>
+                    <p className="mb-8 px-4 text-zinc-500">
+                        Tu rol no tiene acceso a esta tabla de control.
+                    </p>
+                    <p className="text-[11px] font-semibold uppercase tracking-widest text-zinc-400">
                         GEO-FAL S.A.S • Seguridad Interna
                     </p>
                 </div>
