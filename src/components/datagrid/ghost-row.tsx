@@ -203,7 +203,7 @@ export function GhostRow<TData>({ table, onInsert }: GhostRowProps<TData>) {
         const codigoMuestra = newData['codigo_muestra' as keyof TData] as string
         if (codigoMuestra) {
             const isDuplicate = existingData.some(row =>
-                row.codigo_muestra?.trim().toLowerCase() === codigoMuestra.trim().toLowerCase()
+                String(row.codigo_muestra ?? "").trim().toLowerCase() === codigoMuestra.trim().toLowerCase()
             )
 
             if (isDuplicate) {

@@ -24,6 +24,7 @@ export interface ProgramacionServicio {
     evidencia_solicitud_envio?: string | null
     dias_atraso_envio_coti?: number | null
     motivo_dias_atraso_com?: string | null
+    costo_servicio?: string | number | null
     numero_factura?: string | null
     estado_pago?: string | null
     estado_autorizar?: string | null
