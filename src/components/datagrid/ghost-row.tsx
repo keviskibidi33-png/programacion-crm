@@ -183,12 +183,25 @@ export function GhostRow<TData>({ table, onInsert }: GhostRowProps<TData>) {
             recep_numero: newData['recep_numero' as keyof TData],
             ot: newData['ot' as keyof TData]
         }
+        const existingData = (table.options.data as Array<Record<string, unknown>>) || []
+
+        const itemNumero = newData['item_numero' as keyof TData]
+        if (itemNumero !== undefined && itemNumero !== null && String(itemNumero).trim() !== "") {
+            const normalizedItemNumero = String(itemNumero).trim()
+            const isDuplicateItem = existingData.some(row =>
+                String(row.item_numero ?? "").trim() === normalizedItemNumero
+            )
+            toast.error("ITEM protegido", {
+                description: isDuplicateItem
+                    ? `El ITEM "${normalizedItemNumero}" ya existe en otra fila.`
+                    : "El ITEM se asigna automáticamente y no puede editarse manualmente.",
+            })
+            return
+        }
 
         // --- DUPLICATE CODIGO MUESTRA CHECK ---
         const codigoMuestra = newData['codigo_muestra' as keyof TData] as string
         if (codigoMuestra) {
-            // @ts-ignore - TData is ProgramacionServicio
-            const existingData = (table.options.data as any[]) || []
             const isDuplicate = existingData.some(row =>
                 row.codigo_muestra?.trim().toLowerCase() === codigoMuestra.trim().toLowerCase()
             )
