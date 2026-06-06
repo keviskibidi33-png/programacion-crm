@@ -181,19 +181,39 @@ export function useProgramacionData() {
         refetchOnWindowFocus: false,
         refetchOnReconnect: false,
         queryFn: async () => {
-            const { data, error } = await (supabase
-                .from("cuadro_control") as any)
-                .select("*")
-                .order("item_numero", { ascending: true })
-                .order("created_at", { ascending: true })
-                .order("id", { ascending: true })
+            let allData: ProgramacionServicio[] = []
+            let from = 0
+            let to = 999
+            let hasMore = true
 
-            if (error) {
-                console.error("Error fetching data:", error)
-                toast.error("Error al cargar datos")
-                throw error
+            while (hasMore) {
+                const { data, error } = await (supabase
+                    .from("cuadro_control") as any)
+                    .select("*")
+                    .order("item_numero", { ascending: true })
+                    .order("created_at", { ascending: true })
+                    .order("id", { ascending: true })
+                    .range(from, to)
+
+                if (error) {
+                    console.error("Error fetching data:", error)
+                    toast.error("Error al cargar datos")
+                    throw error
+                }
+
+                if (data && data.length > 0) {
+                    allData = [...allData, ...data]
+                    if (data.length < 1000) {
+                        hasMore = false
+                    } else {
+                        from += 1000
+                        to += 1000
+                    }
+                } else {
+                    hasMore = false
+                }
             }
-            return data as ProgramacionServicio[]
+            return allData
         },
     })
 
