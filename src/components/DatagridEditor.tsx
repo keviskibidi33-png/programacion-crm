@@ -4,10 +4,12 @@
 import React from "react"
 import { DataTable } from "@/components/datagrid/data-table"
 import { columnsLab } from "@/components/datagrid/columns"
+import { columnsAdmin } from "@/components/datagrid/columns-admin"
 import { useProgramacionData } from "@/hooks/use-programacion-data"
-import { RefreshCw, Wifi, WifiOff, FileDown, Info, Lock } from "lucide-react"
+import { RefreshCw, Wifi, WifiOff, FileDown, Info, Lock, Building2, FlaskConical } from "lucide-react"
 import { LoginButton } from "@/components/login-button"
 import { useCurrentUser } from "@/hooks/use-current-user"
+import { useSearchParams } from "next/navigation"
 import type { ProgramacionServicio } from "@/types/programacion"
 import { hasScopedProgramacionViewAccess } from "@/lib/programacion-column-access"
 
@@ -24,12 +26,16 @@ export function DatagridEditor() {
         () => userId || role || "anonymous",
         [role, userId],
     )
-    const viewMode = "LAB" as const
-    const canViewLab = React.useMemo(() => getCanView(viewMode), [getCanView, viewMode])
+    const searchParams = useSearchParams()
+    const isAdminMode = searchParams.get("mode") === "admin"
+    const viewMode = isAdminMode ? "ADMIN" : "LAB"
+    const canView = React.useMemo(() => getCanView(viewMode), [getCanView, viewMode])
     const canWrite = React.useMemo(() => getCanWrite(viewMode), [viewMode, getCanWrite])
-    const hasScopedLabColumnAccess = hasScopedProgramacionViewAccess(email, viewMode)
+    const columns = React.useMemo(() => isAdminMode ? columnsAdmin : columnsLab, [isAdminMode])
+    const hasScopedColumnAccess = hasScopedProgramacionViewAccess(email, viewMode)
+    const exportMode = isAdminMode ? "administracion" : "lab"
 
-    const tableStateStorageKey = `${PROGRAMACION_TABLE_STORAGE_PREFIX}:${storageIdentity}:LAB`
+    const tableStateStorageKey = `${PROGRAMACION_TABLE_STORAGE_PREFIX}:${storageIdentity}:${isAdminMode ? "ADMIN" : "LAB"}`
 
     // 1. Loading State
     if (authLoading) {
@@ -65,7 +71,7 @@ export function DatagridEditor() {
         )
     }
 
-    if (!canViewLab) {
+    if (!canView) {
         return (
             <div className="flex h-screen w-full flex-col items-center justify-center bg-zinc-50 p-4">
                 <div className="w-full max-w-md rounded-xl border border-zinc-200 bg-white p-8 text-center shadow-xl">
@@ -95,7 +101,7 @@ export function DatagridEditor() {
                             <RefreshCw className="w-4 h-4" />
                         </div>
                         <h1 className="font-semibold text-lg tracking-tight text-zinc-800">
-                            Programación
+                            Programación {isAdminMode && <span className="text-blue-600">/ Administración</span>}
                         </h1>
                         <span className="text-xs text-zinc-500 bg-zinc-100 px-2 py-0.5 rounded-full border border-zinc-200 font-mono">
                             {data.length}
@@ -103,18 +109,18 @@ export function DatagridEditor() {
                     </div>
 
                     <div className="flex items-center gap-2 rounded-lg border border-zinc-200 bg-zinc-100 px-3 py-1.5">
-                        <span className="px-3 py-1 text-xs font-semibold rounded-md bg-white text-blue-600 shadow-sm">
-                            Laboratorio
+                        <span className={'px-3 py-1 text-xs font-semibold rounded-md bg-white shadow-sm flex items-center gap-1 ' + (isAdminMode ? 'text-indigo-600' : 'text-blue-600')}>
+                            {isAdminMode ? <><Building2 className="w-3 h-3" /> Administración</> : <><FlaskConical className="w-3 h-3" /> Laboratorio</>}
                         </span>
                     </div>
 
-                    {!canWrite && !hasScopedLabColumnAccess && (
+                    {!canWrite && !hasScopedColumnAccess && (
                         <span className="px-2.5 py-1 text-[10px] uppercase font-bold text-amber-600 bg-amber-50 border border-amber-200 rounded-md flex items-center gap-1.5 cursor-default" title="Solo lectura para esta vista">
                             <Info className="w-3 h-3" />
                             Vista Solo Lectura
                         </span>
                     )}
-                    {!canWrite && hasScopedLabColumnAccess && (
+                    {!canWrite && hasScopedColumnAccess && (
                         <span className="px-2.5 py-1 text-[10px] uppercase font-bold text-blue-700 bg-blue-50 border border-blue-200 rounded-md flex items-center gap-1.5 cursor-default" title="Permiso limitado: solo Entrega real y Estado">
                             <Info className="w-3 h-3" />
                             Edicion Limitada
@@ -125,13 +131,13 @@ export function DatagridEditor() {
                 <div className="flex items-center gap-3">
                     <button
                         onClick={() => {
-                            exportToExcel(filteredItems, "lab")
+                            exportToExcel(filteredItems, exportMode)
                         }}
                         disabled={data.length === 0}
                         className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-xs font-medium transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         <FileDown className="w-3.5 h-3.5" />
-                        <span>Exportar Excel</span>
+                        <span>Exportar Excel {isAdminMode ? "(Admin)" : ""}</span>
                     </button>
 
                     <div className="flex items-center gap-3">
@@ -154,7 +160,7 @@ export function DatagridEditor() {
             <div className="flex-1 overflow-hidden bg-zinc-50 p-1">
                 <DataTable
                     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    columns={columnsLab as any}
+                    columns={columns as any}
                     data={data}
                     loading={isLoading}
                     onUpdate={updateField}
@@ -166,7 +172,7 @@ export function DatagridEditor() {
                     viewMode={viewMode}
                     onFilteredDataChange={setFilteredItems}
                     storageKey={tableStateStorageKey}
-                    key={`${storageIdentity}:LAB`} // Reset table internals only when user changes.
+                    key={`${storageIdentity}:${isAdminMode ? "ADMIN" : "LAB"}`}
                 />
             </div>
         </div>
