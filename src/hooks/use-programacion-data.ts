@@ -24,6 +24,17 @@ class ExpiringSet {
     clear() { this.map.forEach(t => clearTimeout(t)); this.map.clear() }
 }
 
+function computeDiasAtraso(estimatedStr: string | null | undefined, realStr: string | null | undefined): number {
+    if (!estimatedStr) return 0
+    const estimated = new Date(estimatedStr)
+    const real = realStr ? new Date(realStr) : new Date()
+    estimated.setHours(0, 0, 0, 0)
+    real.setHours(0, 0, 0, 0)
+    const diffDays = Math.round((real.getTime() - estimated.getTime()) / (1000 * 60 * 60 * 24))
+    if (!realStr && diffDays <= 0) return 0
+    return diffDays
+}
+
 const EXPORT_AUTH_TRACE_PREFIX = "[ProgramacionExportAuth]"
 const PROGRAMACION_EXPORT_DEBUG = process.env.NODE_ENV !== "production" || process.env.NEXT_PUBLIC_DEBUG_IFRAME_BRIDGE === "true"
 
@@ -313,11 +324,30 @@ export function useProgramacionData() {
 
         const derivedItemNumero = field === "ot" ? deriveItemNumeroFromOt(value) : null
 
+        // Compute derived delay fields when date fields change
+        const derivedUpdates: Record<string, unknown> = {}
+        if (field === "entrega_real" || field === "fecha_entrega_estimada") {
+            const row = queryClient.getQueryData<ProgramacionServicio[]>(["programacion"])?.find(r => r.id === rowId)
+            if (row) {
+                const estimated = field === "fecha_entrega_estimada" ? (value as string) : row.fecha_entrega_estimada
+                const real = field === "entrega_real" ? (value as string) : row.entrega_real
+                derivedUpdates.dias_atraso_lab = computeDiasAtraso(estimated, real)
+            }
+        }
+        if (field === "fecha_solicitud_com" || field === "fecha_entrega_com") {
+            const row = queryClient.getQueryData<ProgramacionServicio[]>(["programacion"])?.find(r => r.id === rowId)
+            if (row) {
+                const solicitud = field === "fecha_solicitud_com" ? (value as string) : row.fecha_solicitud_com
+                const entrega = field === "fecha_entrega_com" ? (value as string) : row.fecha_entrega_com
+                derivedUpdates.dias_atraso_envio_coti = computeDiasAtraso(solicitud, entrega)
+            }
+        }
+
         // 1. Optimistic Update in Cache (instant UI)
         queryClient.setQueryData(["programacion"], (oldData: ProgramacionServicio[] = []) => {
             return oldData.map(row => {
                 if (row.id !== rowId) return row
-                const nextRow = { ...row, [field]: value }
+                const nextRow = { ...row, [field]: value, ...derivedUpdates }
                 if (derivedItemNumero !== null) {
                     nextRow.item_numero = derivedItemNumero
                 }
@@ -354,6 +384,7 @@ export function useProgramacionData() {
                 .from(targetTable) as any)
                 .update({
                     [field]: value,
+                    ...derivedUpdates,
                     ...(derivedItemNumero !== null ? { item_numero: derivedItemNumero } : {}),
                     updated_at: new Date().toISOString(),
                 })
@@ -375,6 +406,11 @@ export function useProgramacionData() {
             ...newRow,
             ot: normalizedOt || newRow.ot,
             estado_trabajo: newRow.estado_trabajo || "PENDIENTE",
+        }
+
+        // Pre-compute dias_atraso_lab if both dates are present
+        if (labData.fecha_entrega_estimada && labData.entrega_real) {
+            labData.dias_atraso_lab = computeDiasAtraso(labData.fecha_entrega_estimada, labData.entrega_real)
         }
 
         // item_numero is a DB-managed correlativo; never derive it from OT
