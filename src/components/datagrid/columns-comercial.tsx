@@ -119,8 +119,14 @@ export const columnsComercial: ColumnDef<ProgramacionServicio>[] = [
     {
         accessorKey: "motivo_dias_atraso_com",
         header: ({ column }) => <SortableHeader column={column} title={`MOTIVO\nDIAS ATRASO`} />,
-        size: 400, minSize: 200, maxSize: 800, enableResizing: true,
+        size: 300, minSize: 150, maxSize: 500, enableResizing: true,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        cell: (props: any) => <EditableCell {...props} className="text-zinc-800 text-[12px] whitespace-normal break-words" />,
+    },
+    {
+        accessorKey: "nota_lab",
+        header: ({ column }) => <SortableHeader column={column} title={`NOTAS\nLAB`} />,
+        size: 250, minSize: 150, maxSize: 500, enableResizing: true,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         cell: (props: any) => <EditableCell {...props} className="text-zinc-800 text-[12px] whitespace-normal break-words" />,
     },
