@@ -8,6 +8,7 @@ const SPECIAL_PROGRAMACION_EDITABLE_COLUMNS = new Set([
     "entrega_real",
     "estado_trabajo",
     "nota_lab",
+    "envio_informes",
 ])
 
 export function normalizeProgramacionAccessValue(value: string | null | undefined) {
