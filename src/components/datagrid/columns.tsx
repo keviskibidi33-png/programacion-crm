@@ -35,6 +35,48 @@ const formatDateToShort = (dateStr: string | null) => {
     }
 }
 
+const EXCEL_EPOCH_UTC = Date.UTC(1899, 11, 30)
+const MS_PER_DAY = 1000 * 60 * 60 * 24
+
+const parseDateOnlyUtc = (dateStr: string | null) => {
+    if (!dateStr) return null
+    const cleaned = dateStr.trim().split("T")[0]
+    const match = cleaned.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+    if (!match) return null
+
+    const [, year, month, day] = match
+    const date = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day)))
+    return Number.isNaN(date.getTime()) ? null : date
+}
+
+const getExcelSerialDate = (date: Date) => {
+    return Math.round((date.getTime() - EXCEL_EPOCH_UTC) / MS_PER_DAY)
+}
+
+const calculateDiasAtrasoLabExcel = (estimatedDateStr: string | null, realDateStr: string | null) => {
+    const estimated = parseDateOnlyUtc(estimatedDateStr)
+    if (!estimated) return null
+
+    const real = parseDateOnlyUtc(realDateStr)
+    if (!real) {
+        return -getExcelSerialDate(estimated)
+    }
+
+    return Math.round((real.getTime() - estimated.getTime()) / MS_PER_DAY)
+}
+
+function useSyncedEditableValue<T>(externalValue: T) {
+    const [value, setValue] = React.useState(externalValue)
+    const [lastExternalValue, setLastExternalValue] = React.useState(externalValue)
+
+    if (externalValue !== lastExternalValue) {
+        setLastExternalValue(externalValue)
+        setValue(externalValue)
+    }
+
+    return [value, setValue] as const
+}
+
 // Export components for use in other column definitions
 export { EditableCell, OTCell, SmartDateCell, CotizacionCell, AutorizacionCell, PaymentStatusCell, StatusCell }
 
@@ -50,7 +92,7 @@ export type EditableCellProps<TData> = {
 // Editable Cell Component
 const EditableCell = React.memo(({ getValue, row: { original }, column: { id }, table, className }: EditableCellProps<ProgramacionServicio>) => {
     const initialValue = getValue()
-    const [value, setValue] = React.useState(initialValue)
+    const [value, setValue] = useSyncedEditableValue(initialValue)
 
     // --- Column-Based Permissions by Role ---
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -95,11 +137,6 @@ const EditableCell = React.memo(({ getValue, row: { original }, column: { id }, 
     }
 
     const canWrite = getCanWriteColumn()
-
-    // Sync external changes
-    React.useEffect(() => {
-        setValue(initialValue)
-    }, [initialValue])
 
     const onBlur = () => {
         if (value !== initialValue) {
@@ -185,11 +222,7 @@ EditableCell.displayName = "EditableCell"
 // OT Cell (Auto-adds -26 when user enters just digits)
 const OTCell = React.memo(({ getValue, row: { original }, column: { id }, table }: EditableCellProps<ProgramacionServicio>) => {
     const rawValue = getValue() as string
-    const [value, setValue] = React.useState(normalizeProgramacionOtValue(rawValue))
-
-    React.useEffect(() => {
-        setValue(normalizeProgramacionOtValue(rawValue))
-    }, [rawValue])
+    const [value, setValue] = useSyncedEditableValue(normalizeProgramacionOtValue(rawValue))
 
     // Permission check - Column-based restrictions by role
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -264,7 +297,7 @@ const SmartDateCell = React.memo(({ getValue, row: { original }, column: { id },
         } catch { return val }
     }
 
-    const [inputValue, setInputValue] = React.useState(formatDisplay(rawValue))
+    const [inputValue, setInputValue] = useSyncedEditableValue(formatDisplay(rawValue))
     const [isEditing, setIsEditing] = React.useState(false)
 
     // Permission check - Column-based restrictions by role
@@ -284,10 +317,6 @@ const SmartDateCell = React.memo(({ getValue, row: { original }, column: { id },
         return meta?.canWrite ?? false
     }
     const canWrite = getCanWriteColumn()
-
-    React.useEffect(() => {
-        setInputValue(formatDisplay(rawValue))
-    }, [rawValue])
 
     const onBlur = () => {
         if (!canWrite) {
@@ -874,7 +903,8 @@ export const columnsLab: ColumnDef<ProgramacionServicio>[] = [
         ),
     },
     {
-        accessorKey: "dias_atraso_lab",
+        id: "dias_atraso_lab",
+        accessorFn: (row) => calculateDiasAtrasoLabExcel(row.fecha_entrega_estimada, row.entrega_real),
         header: ({ column }) => <SortableHeader column={column} title={`DIAS\nATRASO`} />,
         size: 80,
         minSize: 60,
@@ -882,27 +912,13 @@ export const columnsLab: ColumnDef<ProgramacionServicio>[] = [
         enableResizing: true,
         filterFn: (row, columnId, filterValue) => {
             if (!filterValue) return true
-            const val = row.getValue(columnId) as number
-            return val > 0
+            const val = row.getValue(columnId) as number | null
+            return typeof val === "number" && val > 0
         },
-        cell: ({ row }) => {
-            const estimatedDateStr = row.original.fecha_entrega_estimada
-            const realDateStr = row.original.entrega_real
+        cell: ({ getValue }) => {
+            const diffDays = getValue<number | null>()
 
-            if (!estimatedDateStr) return <div className="text-zinc-300 text-center">-</div>
-
-            const estimated = new Date(estimatedDateStr)
-            const real = realDateStr ? new Date(realDateStr) : new Date()
-
-            estimated.setHours(0, 0, 0, 0)
-            real.setHours(0, 0, 0, 0)
-
-            const diffTime = real.getTime() - estimated.getTime()
-            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-
-            if (!realDateStr && diffDays <= 0) {
-                return <div className="text-center font-mono text-zinc-900">0</div>
-            }
+            if (diffDays === null) return <div className="text-zinc-300 text-center">-</div>
 
             return (
                 <div className={`text-center font-mono ${diffDays > 0 ? "text-red-600 font-bold" : "text-zinc-900"}`}>

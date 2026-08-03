@@ -24,15 +24,54 @@ class ExpiringSet {
     clear() { this.map.forEach(t => clearTimeout(t)); this.map.clear() }
 }
 
+interface PostgrestBuilder {
+    update: (values: Record<string, unknown>) => PostgrestBuilder
+    insert: (values: Record<string, unknown> | Record<string, unknown>[]) => PostgrestBuilder
+    select: (columns?: string) => PostgrestBuilder
+    single: () => Promise<{ data: Record<string, unknown> | null; error: unknown }>
+    maybeSingle: () => Promise<{ data: Record<string, unknown> | null; error: unknown }>
+    eq: (column: string, value: unknown) => PostgrestBuilder
+    order: (column: string, options?: { ascending?: boolean }) => PostgrestBuilder
+    range: (from: number, to: number) => Promise<{ data: ProgramacionServicio[] | null; error: Error | null }>
+    then: PromiseLike<{ data: Record<string, unknown> | null; error: unknown }>["then"]
+}
+
+interface AuthTokenPayload {
+    access_token?: unknown
+    currentSession?: AuthTokenPayload
+    session?: AuthTokenPayload
+}
+
+interface RealtimePayload {
+    eventType: string
+    new: Record<string, unknown> | null
+    old: Record<string, unknown> | null
+}
+
+const EXCEL_EPOCH_UTC = Date.UTC(1899, 11, 30)
+const MS_PER_DAY = 1000 * 60 * 60 * 24
+
+function parseDateOnlyUtc(dateStr: string | null | undefined) {
+    if (!dateStr) return null
+    const cleaned = dateStr.trim().split("T")[0]
+    const match = cleaned.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+    if (!match) return null
+
+    const [, year, month, day] = match
+    const date = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day)))
+    return Number.isNaN(date.getTime()) ? null : date
+}
+
 function computeDiasAtraso(estimatedStr: string | null | undefined, realStr: string | null | undefined): number {
-    if (!estimatedStr) return 0
-    const estimated = new Date(estimatedStr)
-    const real = realStr ? new Date(realStr) : new Date()
-    estimated.setHours(0, 0, 0, 0)
-    real.setHours(0, 0, 0, 0)
-    const diffDays = Math.round((real.getTime() - estimated.getTime()) / (1000 * 60 * 60 * 24))
-    if (!realStr && diffDays <= 0) return 0
-    return diffDays
+    const estimated = parseDateOnlyUtc(estimatedStr)
+    if (!estimated) return 0
+
+    const real = parseDateOnlyUtc(realStr)
+    if (!real) {
+        return -Math.round((estimated.getTime() - EXCEL_EPOCH_UTC) / MS_PER_DAY)
+    }
+
+    return Math.round((real.getTime() - estimated.getTime()) / MS_PER_DAY)
 }
 
 const EXPORT_AUTH_TRACE_PREFIX = "[ProgramacionExportAuth]"
@@ -94,12 +133,18 @@ export function useProgramacionData() {
             || localStorage.getItem("token")
         if (direct) return direct
 
-        const extractToken = (parsed: any): string | null => {
+        const extractToken = (parsed: unknown): string | null => {
             if (!parsed) return null
-            if (typeof parsed?.access_token === "string" && parsed.access_token) return parsed.access_token
-            if (typeof parsed?.currentSession?.access_token === "string" && parsed.currentSession.access_token) return parsed.currentSession.access_token
-            if (typeof parsed?.session?.access_token === "string" && parsed.session.access_token) return parsed.session.access_token
-            if (Array.isArray(parsed) && typeof parsed[0]?.access_token === "string" && parsed[0].access_token) return parsed[0].access_token
+            if (Array.isArray(parsed)) {
+                const first = parsed[0] as AuthTokenPayload | undefined
+                return typeof first?.access_token === "string" && first.access_token ? first.access_token : null
+            }
+
+            if (typeof parsed !== "object") return null
+            const payload = parsed as AuthTokenPayload
+            if (typeof payload.access_token === "string" && payload.access_token) return payload.access_token
+            if (typeof payload.currentSession?.access_token === "string" && payload.currentSession.access_token) return payload.currentSession.access_token
+            if (typeof payload.session?.access_token === "string" && payload.session.access_token) return payload.session.access_token
             return null
         }
 
@@ -199,7 +244,7 @@ export function useProgramacionData() {
 
             while (hasMore) {
                 const { data, error } = await (supabase
-                    .from("cuadro_control") as any)
+                    .from("cuadro_control") as unknown as PostgrestBuilder)
                     .select("*")
                     .order("item_numero", { ascending: true })
                     .order("created_at", { ascending: true })
@@ -229,9 +274,9 @@ export function useProgramacionData() {
     })
 
     // 2. Realtime handler — NEVER calls invalidateQueries for UPDATEs
-    const handleRealtimePayload = useCallback((payload: any) => {
+    const handleRealtimePayload = useCallback((payload: RealtimePayload) => {
         const rec = payload.new || payload.old || {}
-        const viewId: string | undefined = rec.programacion_id || rec.id
+        const viewId = (rec.programacion_id || rec.id) as string | undefined
 
         // Skip ALL events caused by our own writes (kept 4 s in ExpiringSet)
         if (viewId && pendingLocalIds.current.has(viewId)) {
@@ -251,16 +296,17 @@ export function useProgramacionData() {
         // of just that one row, NOT a full refetch
         if (eventType === "INSERT" && viewId) {
             // Fetch only the new row from the view
-            ;(supabase.from("cuadro_control") as any)
+            ;(supabase.from("cuadro_control") as unknown as PostgrestBuilder)
                 .select("*")
                 .eq("id", viewId)
                 .maybeSingle()
-                .then(({ data: newRow }: any) => {
+                .then(({ data: newRow }) => {
                     if (!newRow) return
                     queryClient.setQueryData(["programacion"], (old: ProgramacionServicio[] = []) => {
                         // Avoid duplicates
-                        if (old.some(r => r.id === newRow.id)) return old
-                        return [...old, newRow]
+                        const row = newRow as unknown as ProgramacionServicio
+                        if (old.some(r => r.id === row.id)) return old
+                        return [...old, row]
                     })
                 })
             return
@@ -275,7 +321,7 @@ export function useProgramacionData() {
                     const merged = { ...row }
                     for (const key of Object.keys(changed)) {
                         if (key === "id" || key === "programacion_id" || key === "created_at") continue
-                        ;(merged as any)[key] = changed[key]
+                        ;(merged as unknown as Record<string, unknown>)[key] = changed[key]
                     }
                     return merged
                 })
@@ -381,7 +427,7 @@ export function useProgramacionData() {
             }
 
             const { error } = await (supabase
-                .from(targetTable) as any)
+                .from(targetTable) as unknown as PostgrestBuilder)
                 .update({
                     [field]: value,
                     ...derivedUpdates,
@@ -398,11 +444,11 @@ export function useProgramacionData() {
             // Rollback: refetch true state from DB
             queryClient.invalidateQueries({ queryKey: ["programacion"] })
         }
-    }, [queryClient, supabase])
+    }, [queryClient, supabase, deriveItemNumeroFromOt])
 
     const insertRow = useCallback(async (newRow: Partial<ProgramacionServicio>) => {
         const normalizedOt = normalizeProgramacionOtValue(newRow.ot)
-        const labData: any = {
+        const labData: Record<string, unknown> = {
             ...newRow,
             ot: normalizedOt || newRow.ot,
             estado_trabajo: newRow.estado_trabajo || "PENDIENTE",
@@ -410,7 +456,10 @@ export function useProgramacionData() {
 
         // Pre-compute dias_atraso_lab if both dates are present
         if (labData.fecha_entrega_estimada && labData.entrega_real) {
-            labData.dias_atraso_lab = computeDiasAtraso(labData.fecha_entrega_estimada, labData.entrega_real)
+            labData.dias_atraso_lab = computeDiasAtraso(
+                String(labData.fecha_entrega_estimada),
+                String(labData.entrega_real)
+            )
         }
 
         // item_numero is a DB-managed correlativo; never derive it from OT
@@ -435,7 +484,7 @@ export function useProgramacionData() {
         })
 
         const { data: insertedData, error: labError } = await (supabase
-            .from("programacion_lab") as any)
+            .from("programacion_lab") as unknown as PostgrestBuilder)
             .insert(labData)
             .select()
             .single()
@@ -447,11 +496,11 @@ export function useProgramacionData() {
         }
 
         if (insertedData) {
-            const rowId = (insertedData as any).id
+            const rowId = insertedData.id as string
             // Mark so realtime skips our own insert echoes
             pendingLocalIds.current.add(rowId)
 
-            const commercialData: any = {}
+            const commercialData: Record<string, unknown> = {}
             if (newRow.fecha_solicitud_com) commercialData.fecha_solicitud_com = newRow.fecha_solicitud_com
             if (newRow.fecha_entrega_com) commercialData.fecha_entrega_com = newRow.fecha_entrega_com
             if (newRow.evidencia_solicitud_envio) commercialData.evidencia_solicitud_envio = newRow.evidencia_solicitud_envio
@@ -460,7 +509,7 @@ export function useProgramacionData() {
                 commercialData.costo_servicio = newRow.costo_servicio
             }
 
-            const adminData: any = {}
+            const adminData: Record<string, unknown> = {}
             if (newRow.numero_factura) adminData.numero_factura = newRow.numero_factura
             if (newRow.estado_pago) adminData.estado_pago = newRow.estado_pago
             if (newRow.estado_autorizar) adminData.estado_autorizar = newRow.estado_autorizar
@@ -469,19 +518,20 @@ export function useProgramacionData() {
             if (newRow.numero_valorizacion) adminData.numero_valorizacion = newRow.numero_valorizacion
 
             if (Object.keys(commercialData).length > 0) {
-                await (supabase.from("programacion_comercial") as any).update(commercialData).eq("programacion_id", rowId)
+                await (supabase.from("programacion_comercial") as unknown as PostgrestBuilder).update(commercialData).eq("programacion_id", rowId)
             }
             if (Object.keys(adminData).length > 0) {
-                await (supabase.from("programacion_administracion") as any).update(adminData).eq("programacion_id", rowId)
+                await (supabase.from("programacion_administracion") as unknown as PostgrestBuilder).update(adminData).eq("programacion_id", rowId)
             }
 
             // Add to cache directly from view (single-row fetch, NOT full refetch)
-            const { data: viewRow } = await (supabase.from("cuadro_control") as any)
+            const { data: viewRow } = await (supabase.from("cuadro_control") as unknown as PostgrestBuilder)
                 .select("*").eq("id", rowId).maybeSingle()
             if (viewRow) {
                 queryClient.setQueryData(["programacion"], (old: ProgramacionServicio[] = []) => {
-                    if (old.some(r => r.id === viewRow.id)) return old
-                    return [...old, viewRow]
+                    const row = viewRow as unknown as ProgramacionServicio
+                    if (old.some(r => r.id === row.id)) return old
+                    return [...old, row]
                 })
             }
         }

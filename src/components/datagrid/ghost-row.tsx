@@ -71,6 +71,31 @@ export function GhostRow<TData>({ table, onInsert }: GhostRowProps<TData>) {
             } else if (/^(\d+)-(\d+)$/.test(formatted)) {
                 const match = formatted.match(/^(\d+)-(\d+)$/)
                 if (match) {
+                    formatted = `F${match[1].padStart(3, '0')}-${match[2].padStart(4, '0')}`
+                }
+            } else if (/^[fF]\d+$/.test(formatted)) {
+                const nums = formatted.slice(1)
+                const paddedNum = nums.length < 4 ? nums.padStart(4, '0') : nums
+                formatted = `F001-${paddedNum}`
+            }
+        }
+
+        // Date fields: auto-complete to show DD/MM/YYYY format (store ISO internally for DB)
+        const isDateField = ['fecha_recepcion', 'fecha_inicio', 'fecha_entrega_estimada', 'entrega_real', 'fecha_solicitud_com', 'fecha_entrega_com', 'fecha_pago'].includes(columnId)
+        if (isDateField && formatted) {
+            let day = ''
+            let month = ''
+            let yearFull = '2026'
+
+            if (/^\d{4}$/.test(formatted)) {
+                // 1212 -> 12/12/2026
+                day = formatted.slice(0, 2)
+                month = formatted.slice(2, 4)
+            } else if (/^\d{6}$/.test(formatted)) {
+                // 121226 -> 12/12/2026
+                day = formatted.slice(0, 2)
+                month = formatted.slice(2, 4)
+                yearFull = `20${formatted.slice(4, 6)}`
             } else if (/^\d{8}$/.test(formatted)) {
                 // Prefer YYYYMMDD, fallback DDMMYYYY
                 const maybeYear = formatted.slice(0, 4)
@@ -207,7 +232,7 @@ export function GhostRow<TData>({ table, onInsert }: GhostRowProps<TData>) {
             const dateFields = ['fecha_recepcion', 'fecha_inicio', 'fecha_entrega_estimada', 'entrega_real']
             const submitData = { ...newData }
             delete (submitData as Record<string, unknown>).item_numero
-            const otValue = String(submitData.ot ?? "").trim()
+            const otValue = String((submitData as Record<string, unknown>).ot ?? "").trim()
             ;(submitData as Record<string, unknown>).ot = normalizeProgramacionOtValue(otValue) || "-"
 
             for (const field of dateFields) {
