@@ -454,11 +454,11 @@ export function useProgramacionData() {
             estado_trabajo: newRow.estado_trabajo || "PENDIENTE",
         }
 
-        // Pre-compute dias_atraso_lab if both dates are present
-        if (labData.fecha_entrega_estimada && labData.entrega_real) {
+        // Pre-compute dias_atraso_lab when FECHA ENTREGA exists, matching the frontend/export formula even when ENTREGA REAL is blank.
+        if (labData.fecha_entrega_estimada) {
             labData.dias_atraso_lab = computeDiasAtraso(
                 String(labData.fecha_entrega_estimada),
-                String(labData.entrega_real)
+                labData.entrega_real ? String(labData.entrega_real) : null
             )
         }
 
