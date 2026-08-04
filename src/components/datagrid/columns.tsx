@@ -1,6 +1,6 @@
 "use client"
 
-import { Column, ColumnDef, RowData, Table } from "@tanstack/react-table"
+import { Column, ColumnDef, Row, RowData, Table } from "@tanstack/react-table"
 import { ProgramacionServicio } from "@/types/programacion"
 import React from "react"
 import { ArrowUpDown } from "lucide-react"
@@ -63,6 +63,25 @@ const calculateDiasAtrasoLabExcel = (estimatedDateStr: string | null, realDateSt
     }
 
     return Math.round((real.getTime() - estimated.getTime()) / MS_PER_DAY)
+}
+
+const isEvidenceOk = (value: unknown) => {
+    const normalized = String(value ?? "").trim().toLowerCase()
+    return normalized.includes("si") || normalized.includes("ok")
+}
+
+const evidenceFilterFn = (row: Row<ProgramacionServicio>, columnId: string, filterValue: string) => {
+    if (!filterValue) return true
+    const ok = isEvidenceOk(row.getValue(columnId))
+    if (filterValue === "SI") return ok
+    if (filterValue === "FALTANTE") return !ok
+    return true
+}
+
+const monthFilterFn = (row: Row<ProgramacionServicio>, columnId: string, filterValue: string) => {
+    if (!filterValue) return true
+    const value = String(row.getValue(columnId) ?? "").trim()
+    return value.startsWith(filterValue)
 }
 
 function useSyncedEditableValue<T>(externalValue: T) {
@@ -796,6 +815,7 @@ export const columnsLab: ColumnDef<ProgramacionServicio>[] = [
         maxSize: 115,
         enablePinning: true,
         enableResizing: false,
+        filterFn: monthFilterFn,
         cell: SmartDateCell,
     },
     {
@@ -943,6 +963,7 @@ export const columnsLab: ColumnDef<ProgramacionServicio>[] = [
         minSize: 50,
         maxSize: 70,
         enableResizing: true,
+        filterFn: evidenceFilterFn,
         cell: (props) => <EditableCell {...props} className="text-center text-[11px] font-bold text-zinc-900 uppercase" />,
     },
     {
@@ -952,6 +973,7 @@ export const columnsLab: ColumnDef<ProgramacionServicio>[] = [
         minSize: 50,
         maxSize: 70,
         enableResizing: true,
+        filterFn: evidenceFilterFn,
         cell: (props) => <EditableCell {...props} className="text-center text-[11px] font-bold text-zinc-900 uppercase" />,
     },
 ]

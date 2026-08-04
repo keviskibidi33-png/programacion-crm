@@ -18,10 +18,12 @@ import { useVirtualizer } from "@tanstack/react-virtual"
 import { cn } from "@/lib/utils"
 // import { Button } from "@/components/ui/button" 
 import {
+    CalendarDays,
     ChevronLeft,
     ChevronRight,
     ChevronsLeft,
     ChevronsRight,
+    FileCheck2,
     Loader2
 } from "lucide-react"
 import { GhostRow } from "./ghost-row"
@@ -39,6 +41,8 @@ type PersistedTableState = {
     statusFilter: string
     authorizationFilter: string
     paymentFilter: string
+    receptionEvidenceFilter: string
+    receptionMonthFilter: string
     scrollOffset: number
 }
 
@@ -70,6 +74,8 @@ function readPersistedTableState(storageKey?: string): PersistedTableState | nul
             statusFilter: typeof parsed.statusFilter === "string" ? parsed.statusFilter : "TODOS",
             authorizationFilter: typeof parsed.authorizationFilter === "string" ? parsed.authorizationFilter : "TODOS",
             paymentFilter: typeof parsed.paymentFilter === "string" ? parsed.paymentFilter : "TODOS",
+            receptionEvidenceFilter: typeof parsed.receptionEvidenceFilter === "string" ? parsed.receptionEvidenceFilter : "TODOS",
+            receptionMonthFilter: typeof parsed.receptionMonthFilter === "string" ? parsed.receptionMonthFilter : "",
             scrollOffset: typeof parsed.scrollOffset === "number" ? parsed.scrollOffset : 0,
         }
     } catch {
@@ -132,6 +138,8 @@ export function DataTable<TData, TValue>({
     const [statusFilter, setStatusFilter] = React.useState(() => persistedState?.statusFilter ?? "TODOS")
     const [authorizationFilter, setAuthorizationFilter] = React.useState(() => persistedState?.authorizationFilter ?? "TODOS")
     const [paymentFilter, setPaymentFilter] = React.useState(() => persistedState?.paymentFilter ?? "TODOS")
+    const [receptionEvidenceFilter, setReceptionEvidenceFilter] = React.useState(() => persistedState?.receptionEvidenceFilter ?? "TODOS")
+    const [receptionMonthFilter, setReceptionMonthFilter] = React.useState(() => persistedState?.receptionMonthFilter ?? "")
     const [scrollOffset, setScrollOffset] = React.useState(() => persistedState?.scrollOffset ?? 0)
     const hasRestoredScrollRef = React.useRef(false)
 
@@ -173,7 +181,7 @@ export function DataTable<TData, TValue>({
             const searchValue = String(filterValue).toLowerCase().trim()
             if (!searchValue) return true
 
-            const original = row.original as any
+            const original = row.original as Record<string, unknown>
             if (!original) return false
 
             const fieldsToSearch = [
@@ -235,6 +243,8 @@ export function DataTable<TData, TValue>({
                     statusFilter,
                     authorizationFilter,
                     paymentFilter,
+                    receptionEvidenceFilter,
+                    receptionMonthFilter,
                     scrollOffset,
                 } satisfies PersistedTableState),
             )
@@ -249,6 +259,8 @@ export function DataTable<TData, TValue>({
         globalFilter,
         pagination,
         paymentFilter,
+        receptionEvidenceFilter,
+        receptionMonthFilter,
         scrollOffset,
         sorting,
         statusFilter,
@@ -323,24 +335,44 @@ export function DataTable<TData, TValue>({
         }
     }, [table.getFilteredRowModel().rows, onFilteredDataChange])
 
+    const filterControlClass = "h-10 rounded-xl border px-3 text-sm font-semibold shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 cursor-pointer"
+    const inputControlClass = "h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm shadow-sm transition-all placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400"
+
     return (
         <div className="flex flex-col h-full bg-white font-sans text-sm">
             {/* Toolbar Area */}
-            <div className="flex items-center justify-between p-2 border-b border-zinc-200 bg-white gap-2">
-                <div className="flex items-center gap-2 flex-1 flex-wrap">
+            <div className="flex items-center justify-between p-3 border-b border-slate-200 bg-gradient-to-r from-white via-slate-50 to-white gap-2 shadow-sm">
+                <div className="flex items-center gap-2.5 flex-1 flex-wrap">
                     <input
                         placeholder="Buscar en todo..."
                         value={globalFilter ?? ""}
                         onChange={(event) => setGlobalFilter(event.target.value)}
-                        className="h-8 w-[200px] lg:w-[250px] border border-zinc-200 rounded-md px-3 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 bg-zinc-50 text-zinc-900 placeholder:text-zinc-400"
+                        className={cn(inputControlClass, "w-[220px] lg:w-[280px]")}
                     />
+
+                    {table.getAllColumns().find(c => c.id === "fecha_recepcion") && (
+                        <div className="relative">
+                            <CalendarDays className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-blue-600" />
+                            <input
+                                type="month"
+                                value={receptionMonthFilter}
+                                className={cn(inputControlClass, "w-[170px] pl-9 font-semibold text-blue-900")}
+                                onChange={e => {
+                                    const val = e.target.value
+                                    setReceptionMonthFilter(val)
+                                    table.getColumn("fecha_recepcion")?.setFilterValue(val)
+                                }}
+                                title="Filtrar por mes de recepción"
+                            />
+                        </div>
+                    )}
 
                     {/* Filter for Fecha de Entrega (Lab or Comercial) */}
                     {(table.getAllColumns().find(c => c.id === "fecha_entrega_estimada") || table.getAllColumns().find(c => c.id === "fecha_entrega_com")) && (
                         <input
                             type="date"
                             value={deliveryDateFilter}
-                            className="h-8 border border-zinc-200 rounded-md px-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white text-zinc-900 cursor-pointer hover:bg-zinc-50"
+                            className={cn(filterControlClass, "border-slate-200 bg-white text-slate-900 hover:bg-slate-50")}
                             onChange={e => {
                                 const val = e.target.value
                                 setDeliveryDateFilter(val)
@@ -356,7 +388,7 @@ export function DataTable<TData, TValue>({
                     {table.getAllColumns().find(c => c.id === "estado_trabajo") && (
                         <select
                             value={statusFilter}
-                            className="h-8 border border-zinc-200 rounded-md px-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white text-zinc-900 cursor-pointer hover:bg-zinc-50"
+                            className={cn(filterControlClass, "border-slate-200 bg-white text-slate-900 hover:bg-slate-50")}
                             onChange={e => {
                                 const nextValue = e.target.value
                                 setStatusFilter(nextValue)
@@ -376,7 +408,7 @@ export function DataTable<TData, TValue>({
                     {table.getAllColumns().find(c => c.id === "autorizacion_lab") && (
                         <select
                             value={authorizationFilter}
-                            className="h-8 border border-zinc-200 rounded-md px-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 bg-indigo-50 text-indigo-900 cursor-pointer hover:bg-indigo-100 font-medium"
+                            className={cn(filterControlClass, "border-indigo-200 bg-indigo-50 text-indigo-900 hover:bg-indigo-100")}
                             onChange={e => {
                                 const nextValue = e.target.value
                                 setAuthorizationFilter(nextValue)
@@ -389,21 +421,40 @@ export function DataTable<TData, TValue>({
                         </select>
                     )}
 
-                    {/* Payment Status Filter (Admin) - Using 'envio_informes' as field */}
+                    {/* Evidencia de recepción */}
+                    {table.getAllColumns().find(c => c.id === "evidencia_envio_recepcion") && (
+                        <div className="relative">
+                            <FileCheck2 className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-amber-600" />
+                            <select
+                                value={receptionEvidenceFilter}
+                                className={cn(filterControlClass, "w-[155px] border-amber-200 bg-amber-50 pl-9 text-amber-950 hover:bg-amber-100")}
+                                onChange={e => {
+                                    const nextValue = e.target.value
+                                    setReceptionEvidenceFilter(nextValue)
+                                    table.getColumn("evidencia_envio_recepcion")?.setFilterValue(nextValue === "TODOS" ? "" : nextValue)
+                                }}
+                            >
+                                <option value="TODOS">Evi. Recep: Todas</option>
+                                <option value="SI">Evi. Recep: SI</option>
+                                <option value="FALTANTE">Evi. Recep: Faltante</option>
+                            </select>
+                        </div>
+                    )}
+
+                    {/* Envío de informes */}
                     {table.getAllColumns().find(c => c.id === "envio_informes") && (
                         <select
                             value={paymentFilter}
-                            className="h-8 border border-zinc-200 rounded-md px-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 bg-emerald-50 text-emerald-900 cursor-pointer hover:bg-emerald-100 font-medium"
+                            className={cn(filterControlClass, "border-emerald-200 bg-emerald-50 text-emerald-950 hover:bg-emerald-100")}
                             onChange={e => {
                                 const nextValue = e.target.value
                                 setPaymentFilter(nextValue)
                                 table.getColumn("envio_informes")?.setFilterValue(nextValue === "TODOS" ? "" : nextValue)
                             }}
                         >
-                            <option value="TODOS">Pago: Todos</option>
-                            <option value="PENDIENTE">Pendiente</option>
-                            <option value="EN PROCESO">En Proceso</option>
-                            <option value="PAGADO">Pagado</option>
+                            <option value="TODOS">Envío Inf: Todos</option>
+                            <option value="SI">Envío Inf: SI</option>
+                            <option value="FALTANTE">Envío Inf: Faltante</option>
                         </select>
                     )}
                 </div>
