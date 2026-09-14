@@ -198,6 +198,30 @@ export function GhostRow<TData>({ table, onInsert }: GhostRowProps<TData>) {
             return
         }
 
+        // --- DUPLICATE RECEP NUMERO CHECK ---
+        const recepNumero = String(newData['recep_numero' as keyof TData] ?? "").trim()
+        if (recepNumero) {
+            const isDuplicateRecep = existingData.some(row =>
+                String(row.recep_numero ?? "").trim().toLowerCase() === recepNumero.toLowerCase()
+            )
+
+            if (isDuplicateRecep) {
+                toast.error("N° de Recepción ya registrado", {
+                    description: `La recepción "${recepNumero}" ya existe en el sistema. No se permiten registros duplicados.`,
+                })
+                return
+            }
+        }
+
+        // --- CLIENTE NOMBRE VALIDATION (Prevent dates in client column) ---
+        const clienteNombre = String(newData['cliente_nombre' as keyof TData] ?? "").trim()
+        if (clienteNombre && /^\d{1,4}[-/.]\d{1,2}[-/.]\d{1,4}$/.test(clienteNombre)) {
+            toast.error("Formato de cliente inválido", {
+                description: `"${clienteNombre}" parece ser una fecha, no una razón social o cliente. Verifique las columnas antes de guardar.`,
+            })
+            return
+        }
+
         // --- DUPLICATE CODIGO MUESTRA CHECK ---
         const codigoMuestra = newData['codigo_muestra' as keyof TData] as string
         if (codigoMuestra) {

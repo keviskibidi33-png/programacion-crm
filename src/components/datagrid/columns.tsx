@@ -9,6 +9,7 @@ import { normalizeProgramacionOtValue } from "@/lib/programacion-ot"
 import { StatusSelect } from "./status-select"
 import { AuthorizationSelect } from "./authorization-select"
 import { PaymentSelect } from "./payment-select"
+import { RecepNumeroModal } from "./recep-numero-modal"
 import { toast } from "sonner"
 import { hasScopedProgramacionColumnAccess, normalizeProgramacionAccessValue } from "@/lib/programacion-column-access"
 
@@ -97,7 +98,7 @@ function useSyncedEditableValue<T>(externalValue: T) {
 }
 
 // Export components for use in other column definitions
-export { EditableCell, OTCell, SmartDateCell, CotizacionCell, AutorizacionCell, PaymentStatusCell, StatusCell }
+export { EditableCell, RecepNumeroCell, OTCell, SmartDateCell, CotizacionCell, AutorizacionCell, PaymentStatusCell, StatusCell }
 
 export type EditableCellProps<TData> = {
     getValue: () => unknown
@@ -237,6 +238,71 @@ const EditableCell = React.memo(({ getValue, row: { original }, column: { id }, 
     )
 })
 EditableCell.displayName = "EditableCell"
+
+// RecepNumeroCell (Protected with confirmation modal and audit log)
+const RecepNumeroCell = React.memo(({ getValue, row: { original }, column: { id }, table }: EditableCellProps<ProgramacionServicio>) => {
+    const rawValue = (getValue() as string) || ""
+    const [isModalOpen, setIsModalOpen] = React.useState(false)
+
+    // Permission check - Column-based restrictions by role
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const meta = table.options.meta as any
+    const userRole = normalizeProgramacionAccessValue(meta?.userRole)
+
+    const canWrite = (): boolean => {
+        if (meta?.canWrite === false) return false
+        if (userRole === 'admin') return true
+        if (userRole === 'laboratorio_lector' || userRole.includes('lector')) return false
+        return meta?.canWrite ?? false
+    }
+    const hasPermission = canWrite()
+
+    const existingCodes = React.useMemo(() => {
+        const allData = (table.options.data as ProgramacionServicio[]) || []
+        return allData.map(r => r.recep_numero || "").filter(Boolean)
+    }, [table.options.data])
+
+    const handleConfirm = (newCode: string) => {
+        table.options.meta?.updateData(original.id, id, newCode)
+    }
+
+    return (
+        <>
+            <div
+                onClick={() => {
+                    if (hasPermission) setIsModalOpen(true)
+                }}
+                className={cn(
+                    "w-full h-full flex items-center justify-center px-1 font-mono font-bold text-sm tracking-tight transition-colors select-none",
+                    hasPermission
+                        ? "cursor-pointer hover:bg-amber-50 hover:text-amber-900 text-zinc-900"
+                        : "cursor-not-allowed text-zinc-500 bg-zinc-50/50"
+                )}
+                title={hasPermission ? "Haga clic para modificar N° Recepción (requiere doble confirmación y auditoría)" : "Solo lectura"}
+            >
+                {rawValue ? (
+                    <span className="truncate">{rawValue}</span>
+                ) : (
+                    <span className="text-zinc-300 italic text-xs font-normal">Sin N°</span>
+                )}
+            </div>
+
+            {isModalOpen && (
+                <RecepNumeroModal
+                    isOpen={isModalOpen}
+                    onClose={() => setIsModalOpen(false)}
+                    onConfirm={handleConfirm}
+                    currentValue={rawValue}
+                    itemNumero={original.item_numero ?? null}
+                    rowId={original.id}
+                    userEmail={meta?.userEmail}
+                    existingCodes={existingCodes}
+                />
+            )}
+        </>
+    )
+})
+RecepNumeroCell.displayName = "RecepNumeroCell"
 
 // OT Cell (Auto-adds -26 when user enters just digits)
 const OTCell = React.memo(({ getValue, row: { original }, column: { id }, table }: EditableCellProps<ProgramacionServicio>) => {
@@ -526,7 +592,7 @@ const CodigoMuestraCell = React.memo(({ getValue, row: { original }, column: { i
     return (
         <div
             onClick={() => { if (canWrite) { setInputValue(value || ""); setIsEditing(true); } }}
-            className={cn("w-full h-full flex items-center px-1 text-sm text-zinc-900 font-medium leading-tight break-words", canWrite ? "cursor-pointer hover:bg-slate-50" : "cursor-not-allowed bg-zinc-50/30")}
+            className={cn("w-full h-full flex items-center px-1 text-sm text-zinc-900 font-medium leading-tight wrap-break-word", canWrite ? "cursor-pointer hover:bg-slate-50" : "cursor-not-allowed bg-zinc-50/30")}
             title={value || "Click para editar"}
         >
             <span className="line-clamp-3">{value || <span className="text-zinc-300 italic">...</span>}</span>
@@ -785,7 +851,7 @@ export const columnsLab: ColumnDef<ProgramacionServicio>[] = [
         maxSize: 78,
         enablePinning: true,
         enableResizing: false,
-        cell: EditableCell,
+        cell: RecepNumeroCell,
     },
     {
         accessorKey: "ot",
@@ -846,7 +912,7 @@ export const columnsLab: ColumnDef<ProgramacionServicio>[] = [
         maxSize: 160,
         enablePinning: true,
         enableResizing: false,
-        cell: (props) => <EditableCell {...props} className="text-[12.5px] leading-3 text-zinc-900 font-medium break-words whitespace-normal" />,
+        cell: (props) => <EditableCell {...props} className="text-[12.5px] leading-3 text-zinc-900 font-medium wrap-break-word whitespace-normal" />,
     },
     {
         accessorKey: "proyecto",
@@ -855,7 +921,7 @@ export const columnsLab: ColumnDef<ProgramacionServicio>[] = [
         minSize: 100,
         maxSize: 400,
         enableResizing: true,
-        cell: (props) => <EditableCell {...props} className="text-zinc-900 break-words whitespace-normal" />,
+        cell: (props) => <EditableCell {...props} className="text-zinc-900 wrap-break-word whitespace-normal" />,
     },
     {
         accessorKey: "descripcion_servicio",
@@ -865,7 +931,7 @@ export const columnsLab: ColumnDef<ProgramacionServicio>[] = [
         maxSize: 157,
         enablePinning: true,
         enableResizing: false,
-        cell: (props) => <EditableCell {...props} className="text-zinc-900 break-words whitespace-normal" />,
+        cell: (props) => <EditableCell {...props} className="text-zinc-900 wrap-break-word whitespace-normal" />,
     },
     {
         accessorKey: "entrega_real",
