@@ -27,25 +27,32 @@ export function RecepNumeroModal({
     userEmail,
     existingCodes,
 }: RecepNumeroModalProps) {
-    const [mounted, setMounted] = useState(false)
+    const mounted = React.useSyncExternalStore(
+        () => () => {},
+        () => true,
+        () => false,
+    )
     const [newCode, setNewCode] = useState("")
     const [confirmCode, setConfirmCode] = useState("")
     const [isSubmitting, setIsSubmitting] = useState(false)
+    const [prevIsOpen, setPrevIsOpen] = useState(isOpen)
     const inputRef = useRef<HTMLInputElement>(null)
 
-    useEffect(() => {
-        setMounted(true)
-    }, [])
-
-    useEffect(() => {
+    if (isOpen !== prevIsOpen) {
+        setPrevIsOpen(isOpen)
         if (isOpen) {
             setNewCode("")
             setConfirmCode("")
             setIsSubmitting(false)
-            setTimeout(() => {
-                inputRef.current?.focus()
-            }, 50)
         }
+    }
+
+    useEffect(() => {
+        if (!isOpen) return
+        const timer = setTimeout(() => {
+            inputRef.current?.focus()
+        }, 50)
+        return () => clearTimeout(timer)
     }, [isOpen])
 
     if (!mounted || !isOpen) return null

@@ -327,13 +327,19 @@ export function DataTable<TData, TValue>({
         return () => window.cancelAnimationFrame(frameId)
     }, [rows.length, scrollOffset])
 
-    // Notify parent about filtered items
+    // Notify parent about filtered items without infinite re-render loop
+    const filteredRows = table.getFilteredRowModel().rows
+    const lastNotifiedSigRef = React.useRef<string>("")
+
     React.useEffect(() => {
-        if (onFilteredDataChange) {
-            const filteredItems = table.getFilteredRowModel().rows.map(row => row.original)
-            onFilteredDataChange(filteredItems)
-        }
-    }, [table.getFilteredRowModel().rows, onFilteredDataChange])
+        if (!onFilteredDataChange) return
+        const firstId = (filteredRows[0]?.original as Record<string, unknown>)?.id ?? ""
+        const lastId = (filteredRows[filteredRows.length - 1]?.original as Record<string, unknown>)?.id ?? ""
+        const signature = `${filteredRows.length}:${firstId}:${lastId}`
+        if (lastNotifiedSigRef.current === signature) return
+        lastNotifiedSigRef.current = signature
+        onFilteredDataChange(filteredRows.map((row) => row.original))
+    }, [filteredRows, onFilteredDataChange])
 
     const filterControlClass = "h-10 rounded-xl border px-3 text-sm font-semibold shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 cursor-pointer"
     const inputControlClass = "h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm shadow-sm transition-all placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400"

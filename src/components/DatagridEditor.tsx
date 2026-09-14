@@ -23,6 +23,15 @@ export function DatagridEditor() {
 
     // State to track filtered data for Excel export
     const [filteredItems, setFilteredItems] = React.useState<ProgramacionServicio[]>([])
+    const handleFilteredDataChange = React.useCallback((items: ProgramacionServicio[]) => {
+        setFilteredItems((prev) => {
+            if (prev === items) return prev
+            if (prev.length === items.length && (prev.length === 0 || prev[0]?.id === items[0]?.id)) {
+                return prev
+            }
+            return items
+        })
+    }, [])
 
     const handleRefresh = async () => {
         setIsRefreshing(true)
@@ -196,7 +205,7 @@ export function DatagridEditor() {
                     canWrite={canWrite}
                     permissions={permissions}
                     viewMode={viewMode}
-                    onFilteredDataChange={setFilteredItems}
+                    onFilteredDataChange={handleFilteredDataChange}
                     storageKey={tableStateStorageKey}
                     key={`${storageIdentity}:${isAdminMode ? "ADMIN" : "LAB"}`}
                 />
