@@ -10,6 +10,7 @@ import { RefreshCw, Wifi, WifiOff, FileDown, Info, Lock, Building2, FlaskConical
 import { LoginButton } from "@/components/login-button"
 import { useCurrentUser } from "@/hooks/use-current-user"
 import { useSearchParams } from "next/navigation"
+import { toast } from "sonner"
 import type { ProgramacionServicio } from "@/types/programacion"
 import { hasScopedProgramacionViewAccess } from "@/lib/programacion-column-access"
 
@@ -17,10 +18,24 @@ const PROGRAMACION_TABLE_STORAGE_PREFIX = "programacion:table-state:v1"
 
 export function DatagridEditor() {
     const { loading: authLoading, userId, role, email, getCanWrite, getCanView, needsAuth, permissions } = useCurrentUser()
-    const { data, isLoading, realtimeStatus, updateField, insertRow, exportToExcel } = useProgramacionData()
+    const { data, isLoading, realtimeStatus, updateField, insertRow, exportToExcel, refetch } = useProgramacionData()
+    const [isRefreshing, setIsRefreshing] = React.useState(false)
 
     // State to track filtered data for Excel export
     const [filteredItems, setFilteredItems] = React.useState<ProgramacionServicio[]>([])
+
+    const handleRefresh = async () => {
+        setIsRefreshing(true)
+        try {
+            await refetch()
+            toast.success("Datos actualizados correctamente")
+        } catch (error) {
+            console.error("Error al recargar:", error)
+            toast.error("Error al actualizar los datos")
+        } finally {
+            setIsRefreshing(false)
+        }
+    }
 
     const storageIdentity = React.useMemo(
         () => userId || role || "anonymous",
@@ -129,6 +144,17 @@ export function DatagridEditor() {
                 </div>
 
                 <div className="flex items-center gap-3">
+                    {/* Botón Recargar */}
+                    <button
+                        onClick={handleRefresh}
+                        disabled={isRefreshing || isLoading}
+                        title="Recargar datos desde la base de datos"
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-md text-xs font-medium transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? "animate-spin" : ""}`} />
+                        <span>{isRefreshing ? "Actualizando..." : "Recargar"}</span>
+                    </button>
+
                     <button
                         onClick={() => {
                             exportToExcel(filteredItems, exportMode)
