@@ -246,6 +246,8 @@ export function useProgramacionData() {
                 const { data, error } = await (supabase
                     .from("cuadro_control") as unknown as PostgrestBuilder)
                     .select("*")
+                    .order("fecha_recepcion", { ascending: true })
+                    .order("recep_numero", { ascending: true })
                     .order("item_numero", { ascending: true })
                     .order("created_at", { ascending: true })
                     .order("id", { ascending: true })
