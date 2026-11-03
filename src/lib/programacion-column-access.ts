@@ -25,7 +25,7 @@ export function hasScopedProgramacionViewAccess(
 
     // El rol asistente de ingenieria / sedes y Johanie tienen acceso COMPLETO, jamas limitado
     if (
-        normalizedRole.includes("asistente") ||
+        (normalizedRole.includes("asistente") && (normalizedRole.includes("sedes") || normalizedRole.includes("ingenieria"))) ||
         normalizedRole === "asistente_sedes_ingenieria" ||
         normalizedRole === "asistente_ingenieria" ||
         normalizedEmail === "oficinatecnica5@geofal.com.pe"
@@ -49,7 +49,7 @@ export function hasScopedProgramacionColumnAccess(
     const normalizedEmail = normalizeProgramacionAccessValue(email)
 
     if (
-        normalizedRole.includes("asistente") ||
+        (normalizedRole.includes("asistente") && (normalizedRole.includes("sedes") || normalizedRole.includes("ingenieria"))) ||
         normalizedRole === "asistente_sedes_ingenieria" ||
         normalizedRole === "asistente_ingenieria" ||
         normalizedEmail === "oficinatecnica5@geofal.com.pe"

@@ -342,7 +342,7 @@ export function useCurrentUser() {
                 mode === "LAB" && (
                     rNorm === 'asistente_sedes_ingenieria' ||
                     rNorm === 'asistente_ingenieria' ||
-                    rNorm.includes('asistente') ||
+                    (rNorm.includes('asistente') && (rNorm.includes('sedes') || rNorm.includes('ingenieria'))) ||
                     (email && email.toLowerCase().includes('oficinatecnica5')) ||
                     (qEmail && qEmail.toLowerCase().includes('oficinatecnica5'))
                 )

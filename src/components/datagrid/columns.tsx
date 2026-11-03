@@ -125,7 +125,7 @@ const EditableCell = React.memo(({ getValue, row: { original }, column: { id }, 
         if (hasScopedAccess) return true
 
         // 1. ACCESO COMPLETO: Admin, Asistente de Ingenieria / Sedes y Johanie
-        if (userRole === 'admin' || userRole === 'asistente_sedes_ingenieria' || userRole === 'asistente_ingenieria' || userRole.includes('asistente') || meta?.userEmail === 'oficinatecnica5@geofal.com.pe') return true
+        if (userRole === 'admin' || userRole === 'asistente_sedes_ingenieria' || userRole === 'asistente_ingenieria' || (userRole.includes('asistente') && (userRole.includes('sedes') || userRole.includes('ingenieria'))) || meta?.userEmail === 'oficinatecnica5@geofal.com.pe') return true
 
         // 2. GLOBAL OVERRIDE (Read-only tab)
         if (meta?.canWrite === false) return false
@@ -252,7 +252,7 @@ const RecepNumeroCell = React.memo(({ getValue, row: { original }, column: { id 
     const userRole = normalizeProgramacionAccessValue(meta?.userRole)
 
     const canWrite = (): boolean => {
-        if (userRole === 'admin' || userRole === 'asistente_sedes_ingenieria' || userRole === 'asistente_ingenieria' || userRole.includes('asistente') || meta?.userEmail === 'oficinatecnica5@geofal.com.pe') return true
+        if (userRole === 'admin' || userRole === 'asistente_sedes_ingenieria' || userRole === 'asistente_ingenieria' || (userRole.includes('asistente') && (userRole.includes('sedes') || userRole.includes('ingenieria'))) || meta?.userEmail === 'oficinatecnica5@geofal.com.pe') return true
         if (meta?.canWrite === false) return false
         if (userRole === 'laboratorio_lector' || userRole.includes('lector')) return false
         return meta?.canWrite ?? false
@@ -317,7 +317,7 @@ const OTCell = React.memo(({ getValue, row: { original }, column: { id }, table 
     const userRole = normalizeProgramacionAccessValue(meta?.userRole)
 
     const getCanWriteColumn = (): boolean => {
-        if (userRole === 'admin' || userRole === 'asistente_sedes_ingenieria' || userRole === 'asistente_ingenieria' || userRole.includes('asistente') || meta?.userEmail === 'oficinatecnica5@geofal.com.pe') return true
+        if (userRole === 'admin' || userRole === 'asistente_sedes_ingenieria' || userRole === 'asistente_ingenieria' || (userRole.includes('asistente') && (userRole.includes('sedes') || userRole.includes('ingenieria'))) || meta?.userEmail === 'oficinatecnica5@geofal.com.pe') return true
         if (meta?.canWrite === false) return false
         if (userRole === 'laboratorio_lector' || userRole.includes('lector')) return false
         if (userRole === 'laboratorio_tipificador' || userRole.includes('tipificador')) return true
@@ -394,7 +394,7 @@ const SmartDateCell = React.memo(({ getValue, row: { original }, column: { id },
     const hasScopedAccess = hasScopedProgramacionColumnAccess(meta?.userEmail, id, meta?.viewMode)
 
     const getCanWriteColumn = (): boolean => {
-        if (userRole === 'admin' || userRole === 'asistente_sedes_ingenieria' || userRole === 'asistente_ingenieria' || userRole.includes('asistente') || meta?.userEmail === 'oficinatecnica5@geofal.com.pe') return true
+        if (userRole === 'admin' || userRole === 'asistente_sedes_ingenieria' || userRole === 'asistente_ingenieria' || (userRole.includes('asistente') && (userRole.includes('sedes') || userRole.includes('ingenieria'))) || meta?.userEmail === 'oficinatecnica5@geofal.com.pe') return true
         if (hasScopedAccess) return true
         if (meta?.canWrite === false) return false
         if (userRole === 'laboratorio_lector' || userRole.includes('lector')) return false
@@ -541,7 +541,7 @@ const CodigoMuestraCell = React.memo(({ getValue, row: { original }, column: { i
     const userRole = normalizeProgramacionAccessValue(meta?.userRole)
 
     const getCanWriteColumn = (): boolean => {
-        if (userRole === 'admin' || userRole === 'asistente_sedes_ingenieria' || userRole === 'asistente_ingenieria' || userRole.includes('asistente') || meta?.userEmail === 'oficinatecnica5@geofal.com.pe') return true
+        if (userRole === 'admin' || userRole === 'asistente_sedes_ingenieria' || userRole === 'asistente_ingenieria' || (userRole.includes('asistente') && (userRole.includes('sedes') || userRole.includes('ingenieria'))) || meta?.userEmail === 'oficinatecnica5@geofal.com.pe') return true
         if (meta?.canWrite === false) return false
         if (userRole === 'laboratorio_lector' || userRole.includes('lector')) return false
         if (userRole === 'laboratorio_tipificador' || userRole.includes('tipificador')) return true
@@ -721,7 +721,7 @@ const StatusCell = React.memo(({ getValue, row: { original }, column: { id }, ta
     const hasScopedAccess = hasScopedProgramacionColumnAccess(meta?.userEmail, id, meta?.viewMode)
 
     const getCanEditStatus = (): boolean => {
-        if (userRole === 'admin' || userRole === 'asistente_sedes_ingenieria' || userRole === 'asistente_ingenieria' || userRole.includes('asistente') || meta?.userEmail === 'oficinatecnica5@geofal.com.pe') return true
+        if (userRole === 'admin' || userRole === 'asistente_sedes_ingenieria' || userRole === 'asistente_ingenieria' || (userRole.includes('asistente') && (userRole.includes('sedes') || userRole.includes('ingenieria'))) || meta?.userEmail === 'oficinatecnica5@geofal.com.pe') return true
         if (hasScopedAccess) return true
         if (meta?.canWrite === false) return false
         // lector cannot edit anything
