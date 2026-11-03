@@ -98,6 +98,7 @@ export function useCurrentUser() {
 
     // Derived values from URL (Reactive because they depend on searchParams)
     const qUserId = searchParams.get("userId")
+    const qEmail = searchParams.get("email") || searchParams.get("userEmail") || null
     const qRole = searchParams.get("role")?.toLowerCase() || null
     const qCanWrite = searchParams.get("canWrite") === "true"
     const hasCanWriteParam = searchParams.has("canWrite")
@@ -112,7 +113,7 @@ export function useCurrentUser() {
                 : "LAB"
 
     const [role, setRole] = useState<string | null>(qRole)
-    const [email, setEmail] = useState<string | null>(null)
+    const [email, setEmail] = useState<string | null>(qEmail ? qEmail.toLowerCase() : null)
     const [loading, setLoading] = useState(true)
     const [userId, setUserId] = useState<string | null>(qUserId)
     const [needsAuth, setNeedsAuth] = useState(false)
@@ -124,7 +125,7 @@ export function useCurrentUser() {
         const blockedControlRole = isBlockedControlRole(rNorm)
         const isSuperAdmin = rNorm === 'admin' || qIsAdmin
         const dynamicCanWrite = qCanWrite || isSuperAdmin
-        const isLabRole = (rNorm.includes('laboratorio') || rNorm.includes('tipificador')) && !rNorm.includes('lector')
+        const isLabRole = (rNorm.includes('laboratorio') || rNorm.includes('tipificador') || rNorm === 'asistente_sedes_ingenieria') && !rNorm.includes('lector')
 
         if (blockedControlRole) {
             return {
@@ -138,12 +139,12 @@ export function useCurrentUser() {
         return {
             laboratorio: {
                 read: true, // Everyone with access to Programacion can read Lab (at least read-only)
-                write: dynamicCanWrite && (isSuperAdmin || isLabRole),
+                write: dynamicCanWrite && (isSuperAdmin || isLabRole || hasCanWriteParam),
                 delete: false
             },
             programacion: {
                 read: true,
-                write: dynamicCanWrite && (isSuperAdmin || isLabRole),
+                write: dynamicCanWrite && (isSuperAdmin || isLabRole || hasCanWriteParam),
                 delete: false
             },
             comercial: {
@@ -346,7 +347,8 @@ export function useCurrentUser() {
             if (mode === "LAB") {
                 const isLabReadOnly = rNorm.includes('lector')
                 if (isLabReadOnly) return false
-                return permissions?.laboratorio?.write || permissions?.programacion?.write || false
+                if (rNorm === 'asistente_sedes_ingenieria') return true
+                return permissions?.laboratorio?.write || permissions?.programacion?.write || (hasCanWriteParam ? qCanWrite : false)
             }
 
             if (mode === "COM") {

@@ -128,6 +128,8 @@ const EditableCell = React.memo(({ getValue, row: { original }, column: { id }, 
         if (meta?.canWrite === false) return false
 
         // 2. ROLE-SPECIFIC COLUMN LOCKS
+        if (userRole === 'admin' || userRole === 'asistente_sedes_ingenieria') return true
+
         // lector = NO puede editar NADA
         if (userRole === 'laboratorio_lector' || userRole.includes('lector')) return false
 
@@ -251,7 +253,7 @@ const RecepNumeroCell = React.memo(({ getValue, row: { original }, column: { id 
 
     const canWrite = (): boolean => {
         if (meta?.canWrite === false) return false
-        if (userRole === 'admin') return true
+        if (userRole === 'admin' || userRole === 'asistente_sedes_ingenieria') return true
         if (userRole === 'laboratorio_lector' || userRole.includes('lector')) return false
         return meta?.canWrite ?? false
     }
@@ -316,7 +318,7 @@ const OTCell = React.memo(({ getValue, row: { original }, column: { id }, table 
 
     const getCanWriteColumn = (): boolean => {
         if (meta?.canWrite === false) return false
-        if (userRole === 'admin') return true
+        if (userRole === 'admin' || userRole === 'asistente_sedes_ingenieria') return true
         if (userRole === 'laboratorio_lector' || userRole.includes('lector')) return false
         if (userRole === 'laboratorio_tipificador' || userRole.includes('tipificador')) return true
         if (userRole.includes('comercial')) return true
@@ -394,7 +396,7 @@ const SmartDateCell = React.memo(({ getValue, row: { original }, column: { id },
     const getCanWriteColumn = (): boolean => {
         if (hasScopedAccess) return true
         if (meta?.canWrite === false) return false
-        if (userRole === 'admin') return true
+        if (userRole === 'admin' || userRole === 'asistente_sedes_ingenieria') return true
         if (userRole === 'laboratorio_lector' || userRole.includes('lector')) return false
         if (userRole === 'laboratorio_tipificador' || userRole.includes('tipificador')) return true
         if (userRole.includes('comercial')) return true
@@ -540,7 +542,7 @@ const CodigoMuestraCell = React.memo(({ getValue, row: { original }, column: { i
 
     const getCanWriteColumn = (): boolean => {
         if (meta?.canWrite === false) return false
-        if (userRole === 'admin') return true
+        if (userRole === 'admin' || userRole === 'asistente_sedes_ingenieria') return true
         if (userRole === 'laboratorio_lector' || userRole.includes('lector')) return false
         if (userRole === 'laboratorio_tipificador' || userRole.includes('tipificador')) return true
         if (userRole.includes('comercial')) return true
@@ -721,7 +723,7 @@ const StatusCell = React.memo(({ getValue, row: { original }, column: { id }, ta
     const getCanEditStatus = (): boolean => {
         if (hasScopedAccess) return true
         if (meta?.canWrite === false) return false
-        if (userRole === 'admin') return true
+        if (userRole === 'admin' || userRole === 'asistente_sedes_ingenieria') return true
         // lector cannot edit anything
         if (userRole === 'laboratorio_lector' || userRole.includes('lector')) return false
         // tipificador CAN edit estado
