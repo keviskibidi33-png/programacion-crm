@@ -5,13 +5,13 @@ import { useSearchParams } from "next/navigation"
 
 export type ViewMode = "LAB" | "COM" | "ADMIN"
 
-type ModulePermission = {
+export type ModulePermission = {
     read?: boolean
     write?: boolean
     delete?: boolean
 }
 
-type PermissionMap = Record<string, ModulePermission>
+export type PermissionMap = Record<string, ModulePermission>
 
 type SessionTokenPayload = {
     access_token?: string
@@ -336,6 +336,19 @@ export function useCurrentUser() {
 
             // Priority 1: Superadmin always has access
             if (isSuperAdmin) return true
+
+            // Priority 2: Asistente Sedes e Ingenieria / Johanie tiene acceso COMPLETO a LAB
+            if (
+                mode === "LAB" && (
+                    rNorm === 'asistente_sedes_ingenieria' ||
+                    rNorm === 'asistente_ingenieria' ||
+                    rNorm.includes('asistente') ||
+                    (email && email.toLowerCase().includes('oficinatecnica5')) ||
+                    (qEmail && qEmail.toLowerCase().includes('oficinatecnica5'))
+                )
+            ) {
+                return true
+            }
 
             // Parent shell is the authority for the initially requested mode.
             // If it sends canWrite=false, keep strict read-only in that view.

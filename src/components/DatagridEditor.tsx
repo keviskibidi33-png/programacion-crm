@@ -56,7 +56,7 @@ export function DatagridEditor() {
     const canView = React.useMemo(() => getCanView(viewMode), [getCanView, viewMode])
     const canWrite = React.useMemo(() => getCanWrite(viewMode), [viewMode, getCanWrite])
     const columns = React.useMemo(() => isAdminMode ? columnsAdmin : columnsLab, [isAdminMode])
-    const hasScopedColumnAccess = hasScopedProgramacionViewAccess(email, viewMode)
+    const hasScopedColumnAccess = hasScopedProgramacionViewAccess(email, viewMode, role)
     const exportMode = isAdminMode ? "administracion" : "lab"
 
     const tableStateStorageKey = `${PROGRAMACION_TABLE_STORAGE_PREFIX}:${storageIdentity}:${isAdminMode ? "ADMIN" : "LAB"}`
