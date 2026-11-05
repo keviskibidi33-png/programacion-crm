@@ -21,7 +21,7 @@ const STATUS_OPTIONS = [
 const getStatusColor = (status: string) => {
     const s = status?.toUpperCase() || ""
     if (s.includes("ENTREGADO")) return "bg-purple-100 text-purple-800 border-purple-200"
-    if (s.includes("COMPLETADO") || s.includes("LISTO")) return "bg-emerald-100 text-emerald-800 border-emerald-200"
+    if (s.includes("COMPLETADO") || s.includes("LISTO") || s.includes("CULMINADO")) return "bg-emerald-100 text-emerald-800 border-emerald-200"
     if (s.includes("PROCESO")) return "bg-amber-100 text-amber-800 border-amber-200"
     if (s.includes("ANULADO")) return "bg-red-100 text-red-800 border-red-300"
     if (s.includes("PENDIENTE")) return "bg-slate-100 text-slate-700 border-slate-200"
